@@ -1,0 +1,9 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/check-domains",
+      "schedule": "0 08 * * *"
+    }
+  ],
+  "buildCommand": "prisma generate && next build"
+}
