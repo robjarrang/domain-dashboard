@@ -13,6 +13,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// @map("esp")
+model Esp {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  domains   Domain[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("esp")
+}
+
 model Domain {
   id                 String   @id @default(cuid())
   name               String   @unique
@@ -20,11 +31,13 @@ model Domain {
   dkim               String?
   spf                String?
   dmarc              String?
-  dkimStatus         String?  // Added field
-  spfStatus          String?  // Added field
-  dmarcStatus        String?  // Added field
+  dkimStatus         String?
+  spfStatus          String?
+  dmarcStatus        String?
   dismissedAdvisories String?
   lastChecked        DateTime @default(now())
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+  espId              String?
+  esp                Esp?     @relation(fields: [espId], references: [id])
 }

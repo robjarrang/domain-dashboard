@@ -29,6 +29,11 @@ export type DomainRecord = {
   dkimStatus?: DNSStatus;
   spfStatus?: DNSStatus;
   dmarcStatus?: DNSStatus;
+  espId?: string | null;
+  esp?: {
+    id: string;
+    name: string;
+  } | null;
 };
 
 type DomainCardProps = {
@@ -40,7 +45,7 @@ type DomainCardProps = {
 
 const getStatusIcon = (status?: DNSStatus, isLoading?: boolean, isDismissed?: boolean) => {
   if (isLoading) {
-    return <ArrowPathIcon className="w-5 h-5 text-blue-500 animate-spin" />;
+    return <ArrowPathIcon className="w-5 h-5 text-primary animate-spin" />;
   }
   
   if (isDismissed) {
@@ -53,7 +58,7 @@ const getStatusIcon = (status?: DNSStatus, isLoading?: boolean, isDismissed?: bo
     case 'error':
       return <ExclamationTriangleIcon className="w-5 h-5 text-yellow-500" />;
     case 'advisory':
-      return <InformationCircleIcon className="w-5 h-5 text-blue-500" />;
+      return <InformationCircleIcon className="w-5 h-5 text-primary" />;
     case 'not-configured':
     default:
       return <XCircleIcon className="w-5 h-5 text-red-500" />;
@@ -62,19 +67,19 @@ const getStatusIcon = (status?: DNSStatus, isLoading?: boolean, isDismissed?: bo
 
 const getStatusColor = (status?: DNSStatus, isDismissed?: boolean) => {
   if (isDismissed) {
-    return 'text-green-700 bg-green-50';
+    return 'text-green-700 bg-green-50 ring-1 ring-green-600/10';
   }
   
   switch (status) {
     case 'success':
-      return 'text-green-700 bg-green-50';
+      return 'text-green-700 bg-green-50 ring-1 ring-green-600/10';
     case 'error':
-      return 'text-yellow-700 bg-yellow-50';
+      return 'text-yellow-700 bg-yellow-50 ring-1 ring-yellow-600/10';
     case 'advisory':
-      return 'text-blue-700 bg-blue-50';
+      return 'text-deep-teal bg-ice-white ring-1 ring-deep-teal/10';
     case 'not-configured':
     default:
-      return 'text-red-700 bg-red-50';
+      return 'text-red-700 bg-red-50 ring-1 ring-red-600/10';
   }
 };
 
@@ -269,97 +274,100 @@ export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: Doma
   }
 
   return (
-    <div className="bg-white">
-      <div className="group border-b border-gray-200 last:border-b-0">
-        <div 
-          className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors duration-200 cursor-pointer" 
-          onClick={() => setIsOpen(!isOpen)}
-        >
-          <div className="flex-1">
-            <div className="flex items-center gap-4">
-              <h3 className="font-medium text-gray-900">{domain.name}</h3>
-              <StatusIndicators />
-              {error && (
-                <ExclamationCircleIcon className="w-5 h-5 text-red-500" title={error} />
-              )}
-            </div>
-            <p className="mt-1 text-sm text-gray-500">
-              Last checked: {new Date(domain.lastChecked).toLocaleString()}
-            </p>
+    <div className="card overflow-hidden mb-4">
+      <div 
+        className="flex items-center justify-between p-6 cursor-pointer" 
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className="flex-1">
+          <div className="flex items-center gap-4">
+            <h3 className="font-semibold text-lg text-midnight-navy">{domain.name}</h3>
+            {domain.esp && (
+              <span className="px-2 py-0.5 rounded-full text-sm bg-ice-white text-deep-teal">
+                {domain.esp.name}
+              </span>
+            )}
+            <StatusIndicators />
+            {error && (
+              <ExclamationCircleIcon className="w-5 h-5 text-red-500" title={error} />
+            )}
           </div>
-          
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit(domain.id);
-              }}
-              className="p-2 rounded-md text-gray-400 hover:text-primary hover:bg-blue-50 transition-colors duration-200"
-              title="Edit domain"
-            >
-              <PencilIcon className="w-5 h-5" />
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete();
-              }}
-              className="p-2 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors duration-200"
-              title="Delete domain"
-            >
-              <TrashIcon className="w-5 h-5" />
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRefresh();
-              }}
-              disabled={isRefreshing}
-              className="p-2 rounded-md text-gray-400 hover:text-primary hover:bg-blue-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Refresh DNS records"
-            >
-              <ArrowPathIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </button>
-            <div className="p-2 rounded-md text-gray-400">
-              {isOpen ? (
-                <ChevronUpIcon className="w-5 h-5" />
-              ) : (
-                <ChevronDownIcon className="w-5 h-5" />
-              )}
-            </div>
+          <p className="mt-2 text-sm text-deep-teal">
+            Last checked: {new Date(domain.lastChecked).toLocaleString()}
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(domain.id);
+            }}
+            className="p-2.5 rounded-full text-deep-teal hover:text-primary hover:bg-ice-white transition-all duration-200"
+            title="Edit domain"
+          >
+            <PencilIcon className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete();
+            }}
+            className="p-2.5 rounded-full text-deep-teal hover:text-red-600 hover:bg-red-50 transition-all duration-200"
+            title="Delete domain"
+          >
+            <TrashIcon className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRefresh();
+            }}
+            disabled={isRefreshing}
+            className="p-2.5 rounded-full text-deep-teal hover:text-primary hover:bg-ice-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Refresh DNS records"
+          >
+            <ArrowPathIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
+          <div className="p-2.5 rounded-full text-deep-teal">
+            {isOpen ? (
+              <ChevronUpIcon className="w-5 h-5" />
+            ) : (
+              <ChevronDownIcon className="w-5 h-5" />
+            )}
           </div>
         </div>
-
-        <AnimatePresence>
-          {isOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
-            >
-              <div className="p-6 bg-gray-50 space-y-6 border-t border-gray-200">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-900 mb-3">DKIM Record ({domain.dkimSelector}._domainkey)</h4>
-                  {formatRecord(domain.dkim, domain.dkimStatus, 'dkim')}
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-900 mb-3">SPF Record</h4>
-                  {formatRecord(domain.spf, domain.spfStatus, 'spf')}
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-900 mb-3">DMARC Record</h4>
-                  {formatRecord(domain.dmarc, domain.dmarcStatus, 'dmarc')}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="p-6 bg-ice-white space-y-6 border-t border-soft-grey">
+              <div>
+                <h4 className="font-semibold text-midnight-navy mb-3">DKIM Record ({domain.dkimSelector}._domainkey)</h4>
+                {formatRecord(domain.dkim, domain.dkimStatus, 'dkim')}
+              </div>
+              <div>
+                <h4 className="font-semibold text-midnight-navy mb-3">SPF Record</h4>
+                {formatRecord(domain.spf, domain.spfStatus, 'spf')}
+              </div>
+              <div>
+                <h4 className="font-semibold text-midnight-navy mb-3">DMARC Record</h4>
+                {formatRecord(domain.dmarc, domain.dmarcStatus, 'dmarc')}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

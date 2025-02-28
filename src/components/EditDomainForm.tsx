@@ -1,21 +1,71 @@
-import { useState } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+'use client';
+import { useState, useEffect } from 'react';
+import { XMarkIcon, PlusIcon } from '@heroicons/react/24/outline';
+import type { DomainRecord } from './DomainCard';
+
+type ESP = {
+  id: string;
+  name: string;
+};
 
 type EditDomainFormProps = {
-  domain: {
-    id: string;
-    name: string;
-    dkimSelector: string;
-  };
-  onEdit: (domain: { id: string; name: string; dkimSelector: string }) => Promise<void>;
+  domain: DomainRecord;
+  onEdit: (id: string, updates: Partial<DomainRecord>) => Promise<void>;
   onClose: () => void;
 };
 
 export default function EditDomainForm({ domain, onEdit, onClose }: EditDomainFormProps) {
   const [name, setName] = useState(domain.name);
   const [dkimSelector, setDkimSelector] = useState(domain.dkimSelector);
+  const [espId, setEspId] = useState(domain.espId || '');
+  const [esps, setEsps] = useState<ESP[]>([]);
+  const [newEspName, setNewEspName] = useState('');
+  const [showAddEsp, setShowAddEsp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchEsps();
+  }, []);
+
+  const fetchEsps = async () => {
+    try {
+      const response = await fetch('/api/esps');
+      if (!response.ok) throw new Error('Failed to fetch ESPs');
+      const data = await response.json();
+      setEsps(data);
+    } catch (error) {
+      console.error('Error fetching ESPs:', error);
+      setError('Failed to load ESP list');
+    }
+  };
+
+  const handleAddEsp = async () => {
+    if (!newEspName.trim()) {
+      setError('ESP name is required');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/esps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newEspName.trim() })
+      });
+
+      if (!response.ok) throw new Error('Failed to create ESP');
+      
+      const newEsp = await response.json();
+      setEsps([...esps, newEsp]);
+      setEspId(newEsp.id);
+      setNewEspName('');
+      setShowAddEsp(false);
+      setError(null);
+    } catch (error) {
+      console.error('Error creating ESP:', error);
+      setError('Failed to create new ESP');
+    }
+  };
 
   const validateDomain = (domain: string) => {
     const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/i;
@@ -29,99 +79,172 @@ export default function EditDomainForm({ domain, onEdit, onClose }: EditDomainFo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setIsLoading(true);
+    setError(null);
 
     if (!validateDomain(name)) {
       setError('Please enter a valid domain name');
+      setIsLoading(false);
       return;
     }
 
     if (!validateSelector(dkimSelector)) {
       setError('DKIM selector must contain only letters, numbers, and hyphens');
+      setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
-    
     try {
-      await onEdit({ id: domain.id, name, dkimSelector });
+      await onEdit(domain.id, {
+        name,
+        dkimSelector,
+        espId: espId || null,
+      });
       onClose();
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to update domain');
+      console.error('Failed to edit domain:', error);
+      setError(error instanceof Error ? error.message : 'Failed to edit domain');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-500/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium text-gray-900">Edit Domain</h2>
+    <div className="fixed inset-0 bg-midnight-navy/30 backdrop-blur-sm z-50">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="card w-full max-w-md">
+          <div className="flex items-center justify-between p-6 border-b border-soft-grey">
+            <h2 className="text-xl font-semibold text-midnight-navy">Edit Domain</h2>
             <button
               onClick={onClose}
-              className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 transition-colors duration-200"
+              className="p-2.5 rounded-full text-deep-teal hover:text-primary hover:bg-ice-white transition-all duration-200"
             >
               <XMarkIcon className="w-5 h-5" />
             </button>
           </div>
-        </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {error && (
-            <div className="p-3 rounded-md bg-red-50 border border-red-200">
-              <p className="text-sm text-red-600">{error}</p>
+          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            {error && (
+              <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-600">
+                <p className="text-sm">{error}</p>
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <label htmlFor="domain" className="block text-sm font-medium text-deep-teal">
+                Domain Name
+              </label>
+              <input
+                type="text"
+                id="domain"
+                value={name}
+                onChange={(e) => setName(e.target.value.toLowerCase())}
+                placeholder="example.com"
+                className="mt-1 block w-full rounded-xl border-soft-grey shadow-sm focus:border-primary focus:ring-primary transition-all duration-200 placeholder:text-deep-teal/50"
+                required
+              />
+              <p className="text-sm text-deep-teal">
+                Enter the domain name without protocols or paths
+              </p>
             </div>
-          )}
-          
-          <div className="space-y-1">
-            <label htmlFor="domain" className="block text-sm font-medium text-gray-700">
-              Domain Name
-            </label>
-            <input
-              type="text"
-              id="domain"
-              value={name}
-              onChange={(e) => setName(e.target.value.toLowerCase())}
-              placeholder="example.com"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary transition-colors duration-200"
-              required
-            />
-          </div>
 
-          <div className="space-y-1">
-            <label htmlFor="selector" className="block text-sm font-medium text-gray-700">
-              DKIM Selector
-            </label>
-            <input
-              type="text"
-              id="selector"
-              value={dkimSelector}
-              onChange={(e) => setDkimSelector(e.target.value.toLowerCase())}
-              placeholder="default"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary transition-colors duration-200"
-              required
-            />
-          </div>
+            <div className="space-y-2">
+              <label htmlFor="selector" className="block text-sm font-medium text-deep-teal">
+                DKIM Selector
+              </label>
+              <input
+                type="text"
+                id="selector"
+                value={dkimSelector}
+                onChange={(e) => setDkimSelector(e.target.value.toLowerCase())}
+                placeholder="default"
+                className="mt-1 block w-full rounded-xl border-soft-grey shadow-sm focus:border-primary focus:ring-primary transition-all duration-200 placeholder:text-deep-teal/50"
+                required
+              />
+              <p className="text-sm text-deep-teal">
+                The selector used in your DKIM record (e.g., default, google, etc.)
+              </p>
+            </div>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors duration-200"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-md shadow-sm transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
+            <div className="space-y-2">
+              <label htmlFor="esp" className="block text-sm font-medium text-deep-teal">
+                Email Service Provider (ESP)
+              </label>
+              {!showAddEsp ? (
+                <div className="flex gap-2">
+                  <select
+                    id="esp"
+                    value={espId}
+                    onChange={(e) => setEspId(e.target.value)}
+                    className="mt-1 block w-full rounded-xl border-soft-grey shadow-sm focus:border-primary focus:ring-primary transition-all duration-200"
+                  >
+                    <option value="">Select ESP</option>
+                    {esps.map((esp) => (
+                      <option key={esp.id} value={esp.id}>
+                        {esp.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddEsp(true)}
+                    className="mt-1 p-2 rounded-xl bg-ice-white text-deep-teal hover:text-primary transition-colors duration-200"
+                    title="Add new ESP"
+                  >
+                    <PlusIcon className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newEspName}
+                    onChange={(e) => setNewEspName(e.target.value)}
+                    placeholder="Enter ESP name"
+                    className="mt-1 block w-full rounded-xl border-soft-grey shadow-sm focus:border-primary focus:ring-primary transition-all duration-200 placeholder:text-deep-teal/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddEsp}
+                    className="mt-1 px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors duration-200"
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddEsp(false);
+                      setNewEspName('');
+                    }}
+                    className="mt-1 p-2 rounded-xl bg-ice-white text-deep-teal hover:text-primary transition-colors duration-200"
+                  >
+                    <XMarkIcon className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
+              <p className="text-sm text-deep-teal">
+                Select or add the ESP associated with this domain
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="btn-primary"
+              >
+                {isLoading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

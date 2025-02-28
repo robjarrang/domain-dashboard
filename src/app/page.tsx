@@ -4,238 +4,230 @@ import { PlusIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import DomainCard from '@/components/DomainCard';
 import AddDomainForm from '@/components/AddDomainForm';
 import EditDomainForm from '@/components/EditDomainForm';
-import SearchFilter from '@/components/SearchFilter';
+import SearchFilter, { SortOption } from '@/components/SearchFilter';
 import type { DomainRecord } from '@/components/DomainCard';
+
+type ESP = {
+  id: string;
+  name: string;
+};
 
 export default function Home() {
   const [domains, setDomains] = useState<DomainRecord[]>([]);
-  const [filteredDomains, setFilteredDomains] = useState<DomainRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isAddingDomain, setIsAddingDomain] = useState(false);
   const [editingDomain, setEditingDomain] = useState<DomainRecord | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isCheckingAll, setIsCheckingAll] = useState(false);
-  const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [sortBy, setSortBy] = useState('name-asc');
+  const [sortOption, setSortOption] = useState<SortOption>('name-asc');
+  const [esps, setEsps] = useState<ESP[]>([]);
+  const [selectedEspId, setSelectedEspId] = useState('');
 
   const fetchDomains = async () => {
     try {
       const response = await fetch('/api/domains');
-      if (!response.ok) throw new Error('Failed to fetch domains');
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch domains');
+      }
+      
       setDomains(data);
-    } catch (_error) {
-      setError('Failed to load domains');
+    } catch (error) {
+      console.error('Failed to fetch domains:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch domains');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const fetchEsps = async () => {
+    try {
+      const response = await fetch('/api/esps');
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch ESPs');
+      }
+      
+      setEsps(data);
+    } catch (error) {
+      console.error('Failed to fetch ESPs:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch ESPs');
+    }
+  };
+
   useEffect(() => {
     fetchDomains();
+    fetchEsps();
   }, []);
 
-  useEffect(() => {
-    let filtered = [...domains];
-    
-    if (searchQuery) {
-      filtered = filtered.filter(domain => 
-        domain.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-    
-    if (statusFilter) {
-      filtered = filtered.filter(domain => {
-        if (statusFilter === 'success') {
-          return domain.dkimStatus === 'success' && 
-                 domain.spfStatus === 'success' && 
-                 domain.dmarcStatus === 'success';
-        }
-        return domain.dkimStatus === statusFilter || 
-               domain.spfStatus === statusFilter || 
-               domain.dmarcStatus === statusFilter;
-      });
-    }
-
-    // Apply sorting
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'name-asc':
-          return a.name.localeCompare(b.name);
-        case 'name-desc':
-          return b.name.localeCompare(a.name);
-        case 'status-asc':
-        case 'status-desc': {
-          const getStatusScore = (domain: DomainRecord) => {
-            const statuses = [domain.dkimStatus, domain.spfStatus, domain.dmarcStatus];
-            const scores = {
-              'success': 3,
-              'advisory': 2,
-              'error': 1,
-              'not-configured': 0
-            };
-            return statuses.reduce((sum, status) => 
-              sum + (scores[status || 'not-configured'] || 0), 0);
-          };
-          const scoreA = getStatusScore(a);
-          const scoreB = getStatusScore(b);
-          return sortBy === 'status-asc' ? scoreB - scoreA : scoreA - scoreB;
-        }
-        default:
-          return 0;
-      }
-    });
-    
-    setFilteredDomains(filtered);
-  }, [domains, searchQuery, statusFilter, sortBy]);
-
-  const handleAddDomain = async ({ name, dkimSelector }: { name: string; dkimSelector: string }) => {
+  const handleAddDomain = async (domain: Omit<DomainRecord, 'id' | 'lastChecked'>) => {
     const response = await fetch('/api/domains', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, dkimSelector }),
+      body: JSON.stringify(domain),
     });
-
+    
+    const data = await response.json();
+    
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to add domain');
+      throw new Error(data.error || 'Failed to add domain');
     }
-
+    
     await fetchDomains();
   };
 
-  const handleRefreshDomain = async (id: string) => {
-    const response = await fetch(`/api/domains/${id}`);
-    if (!response.ok) {
-      console.error('Failed to refresh domain');
-      return;
-    }
-    const updatedDomain = await response.json();
-    setDomains(domains.map(domain => 
-      domain.id === id ? updatedDomain : domain
-    ));
-  };
-
-  const handleDeleteDomain = async (id: string) => {
-    const response = await fetch(`/api/domains/${id}`, {
-      method: 'DELETE',
-    });
-    
-    if (response.ok) {
-      setDomains(domains.filter(domain => domain.id !== id));
-    } else {
-      setError('Failed to delete domain');
-    }
-  };
-
-  const handleCheckAllDomains = async () => {
-    setIsCheckingAll(true);
-    try {
-      const updatedDomains = await Promise.all(
-        domains.map(async (domain) => {
-          const response = await fetch(`/api/domains/${domain.id}`);
-          if (response.ok) {
-            return await response.json();
-          }
-          return domain;
-        })
-      );
-      setDomains(updatedDomains);
-    } catch (_error) {
-      setError('Failed to check all domains');
-    } finally {
-      setIsCheckingAll(false);
-    }
-  };
-
-  const handleEditDomain = async ({ id, name, dkimSelector }: { id: string; name: string; dkimSelector: string }) => {
+  const handleEditDomain = async (id: string, updates: Partial<DomainRecord>) => {
     const response = await fetch(`/api/domains/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, dkimSelector }),
+      body: JSON.stringify(updates),
     });
-
+    
+    const data = await response.json();
+    
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to update domain');
+      throw new Error(data.error || 'Failed to update domain');
     }
-
+    
     await fetchDomains();
   };
 
+  const handleDeleteDomain = async (id: string) => {
+    try {
+      const response = await fetch(`/api/domains/${id}`, {
+        method: 'DELETE',
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete domain');
+      }
+      
+      await fetchDomains();
+    } catch (error) {
+      console.error('Failed to delete domain:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete domain');
+    }
+  };
+
+  const handleRefreshDomain = async (id: string) => {
+    try {
+      const response = await fetch(`/api/domains/${id}`, {
+        method: 'GET',
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to refresh domain');
+      }
+      
+      await fetchDomains();
+    } catch (error) {
+      console.error('Failed to refresh domain:', error);
+      throw error;
+    }
+  };
+
+  const handleRefreshAll = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Refresh each domain sequentially to avoid overwhelming the DNS servers
+      for (const domain of domains) {
+        await handleRefreshDomain(domain.id);
+      }
+      await fetchDomains();
+    } catch (error) {
+      console.error('Failed to refresh all domains:', error);
+      setError(error instanceof Error ? error.message : 'Failed to refresh all domains');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Filter domains based on search query and ESP
+  const filteredDomains = domains.filter(domain => 
+    domain.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+    (!selectedEspId || domain.espId === selectedEspId)
+  );
+
+  // Sort domains based on selected sort option
+  const sortedDomains = [...filteredDomains].sort((a, b) => {
+    switch (sortOption) {
+      case 'name-asc':
+        return a.name.localeCompare(b.name);
+      case 'name-desc':
+        return b.name.localeCompare(a.name);
+      case 'date-asc':
+        return new Date(a.lastChecked).getTime() - new Date(b.lastChecked).getTime();
+      case 'date-desc':
+        return new Date(b.lastChecked).getTime() - new Date(a.lastChecked).getTime();
+      default:
+        return 0;
+    }
+  });
+
   return (
-    <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-      <div className="px-4 sm:px-0 mb-6">
-        <div className="sm:flex sm:items-center">
-          <div className="sm:flex-auto">
-            <h1 className="text-2xl font-semibold text-gray-900">Domains</h1>
-            <p className="mt-2 text-sm text-gray-700">
-              A list of all domains and their email authentication status
-            </p>
-          </div>
-          <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none space-x-4">
-            <button
-              onClick={handleCheckAllDomains}
-              disabled={isCheckingAll}
-              className="btn-secondary inline-flex items-center"
-            >
-              <ArrowPathIcon className={`h-4 w-4 mr-1.5 ${isCheckingAll ? 'animate-spin' : ''}`} />
-              {isCheckingAll ? 'Checking...' : 'Check All'}
-            </button>
-            <button
-              onClick={() => setIsAddingDomain(true)}
-              className="btn-primary inline-flex items-center"
-            >
-              <PlusIcon className="h-4 w-4 mr-1.5" />
-              Add Domain
-            </button>
-          </div>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <button
+          type="button"
+          onClick={() => setIsAddingDomain(true)}
+          className="btn-primary inline-flex items-center gap-2"
+        >
+          <PlusIcon className="w-5 h-5" />
+          Add Domain
+        </button>
+        <button
+          type="button"
+          onClick={handleRefreshAll}
+          disabled={isLoading}
+          className="btn-secondary inline-flex items-center gap-2"
+          title="Refresh all domains"
+        >
+          <ArrowPathIcon className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh All
+        </button>
       </div>
 
       <SearchFilter 
-        onSearch={setSearchQuery}
-        onFilterStatus={setStatusFilter}
-        onSort={setSortBy}
+        searchQuery={searchQuery} 
+        onSearchChange={setSearchQuery}
+        sortOption={sortOption}
+        onSortChange={setSortOption}
+        selectedEspId={selectedEspId}
+        onEspChange={setSelectedEspId}
+        esps={esps}
       />
 
-      <div className="overflow-hidden rounded-lg bg-white shadow">
-        {error ? (
-          <div className="p-4 bg-red-50 sm:px-6">
-            <div className="flex">
-              <p className="text-sm font-medium text-red-800">{error}</p>
-            </div>
+      <div>
+        {error && (
+          <div className="p-4 rounded-xl bg-red-50 border border-red-200 mb-4">
+            <p className="text-sm text-red-600">{error}</p>
           </div>
-        ) : isLoading ? (
-          <div className="flex justify-center items-center h-32">
-            <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
-          </div>
-        ) : filteredDomains.length === 0 ? (
+        )}
+
+        {isLoading ? (
           <div className="text-center py-12">
-            <h3 className="mt-2 text-sm font-semibold text-gray-900">
-              {domains.length === 0 ? 'No domains' : 'No matching domains'}
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {domains.length === 0 
-                ? 'Get started by adding your first domain'
-                : 'Try adjusting your search or filter'}
+            <ArrowPathIcon className="w-8 h-8 animate-spin mx-auto text-primary" />
+            <p className="mt-2 text-deep-teal">Loading domains...</p>
+          </div>
+        ) : sortedDomains.length === 0 ? (
+          <div className="section-highlight text-center p-12">
+            <h2 className="text-xl font-medium text-white mb-2">No domains found</h2>
+            <p className="text-ice-white/80">
+              {searchQuery 
+                ? 'Try adjusting your search query'
+                : 'Add your first domain to get started'}
             </p>
-            {domains.length === 0 && (
-              <div className="mt-6">
-                <button
-                  onClick={() => setIsAddingDomain(true)}
-                  className="btn-primary"
-                >
-                  <PlusIcon className="-ml-0.5 mr-1.5 h-4 w-4" />
-                  Add Domain
-                </button>
-              </div>
-            )}
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
-            {filteredDomains.map((domain) => (
+          <div className="space-y-4">
+            {sortedDomains.map((domain) => (
               <DomainCard
                 key={domain.id}
                 domain={domain}

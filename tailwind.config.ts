@@ -9,8 +9,12 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        primary: "#3b82f6",
-        "primary-hover": "#2563eb",
+        primary: "#00DECA",
+        "primary-hover": "#00C5B3", // Slightly darker shade of Bright Turquoise
+        "midnight-navy": "#080043", // For headings and primary text
+        "deep-teal": "#004063",     // For secondary actions or elements
+        "soft-grey": "#EAEAEA",     // For borders and dividers
+        "ice-white": "#EEF2FB",     // Background color
       },
     },
   },

@@ -118,7 +118,7 @@ export async function PATCH(
 
   try {
     const body = await request.json();
-    const { dismissedAdvisories, name, dkimSelector } = body;
+    const { dismissedAdvisories, name, dkimSelector, espId } = body;
     
     // If we're updating dismissedAdvisories
     if (dismissedAdvisories !== undefined) {
@@ -147,6 +147,7 @@ export async function PATCH(
         .filter(Boolean);
 
       const finalString = cleanedAdvisories.join(',');
+      
       if (finalString.length > 1000) {
         return NextResponse.json(
           { error: 'Too many advisories to store' },
@@ -159,6 +160,9 @@ export async function PATCH(
         data: { 
           dismissedAdvisories: finalString || null
         },
+        include: {
+          esp: true
+        }
       });
 
       return NextResponse.json({
@@ -169,7 +173,7 @@ export async function PATCH(
     }
 
     // If we're updating domain details
-    if (name || dkimSelector) {
+    if (name || dkimSelector || espId !== undefined) {
       // Basic validation
       if (name) {
         const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/i;
@@ -208,10 +212,14 @@ export async function PATCH(
       const updateData: any = {};
       if (name) updateData.name = name;
       if (dkimSelector) updateData.dkimSelector = dkimSelector;
+      if (espId !== undefined) updateData.espId = espId || null;
 
       const domain = await prisma.domain.update({
         where: { id },
         data: updateData,
+        include: {
+          esp: true
+        }
       });
 
       return NextResponse.json(domain);

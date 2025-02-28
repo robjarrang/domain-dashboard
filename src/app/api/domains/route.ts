@@ -10,6 +10,9 @@ export async function GET(_request: Request) {
   try {
     const domains = await prisma.domain.findMany({
       orderBy: { name: 'asc' },
+      include: {
+        esp: true
+      }
     });
     return NextResponse.json(domains);
   } catch (_error) {
@@ -22,7 +25,7 @@ export async function GET(_request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { name, dkimSelector } = await request.json();
+    const { name, dkimSelector, espId } = await request.json();
     
     // Basic validation
     if (!name || !dkimSelector) {
@@ -65,7 +68,11 @@ export async function POST(request: Request) {
         dkim: formatDNSResult(dkimResult),
         spf: formatDNSResult(spfResult),
         dmarc: formatDNSResult(dmarcResult),
+        espId: espId || null,
       },
+      include: {
+        esp: true
+      }
     });
 
     return NextResponse.json(domain);
