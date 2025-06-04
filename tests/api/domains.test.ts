@@ -63,6 +63,7 @@ describe('Domain API Endpoints', () => {
   describe('DELETE /api/domains/[id]', () => {
     test('should delete domain successfully', async () => {
       // Explicitly resolve the delete operation
+      (prisma.domain.findUnique as jest.Mock).mockResolvedValueOnce({ id: '123' });
       (prisma.domain.delete as jest.Mock).mockResolvedValueOnce({});
 
       const request = new NextRequest('http://localhost');
@@ -76,6 +77,7 @@ describe('Domain API Endpoints', () => {
     });
 
     test('should handle deletion error', async () => {
+      (prisma.domain.findUnique as jest.Mock).mockResolvedValueOnce({ id: '123' });
       (prisma.domain.delete as jest.Mock).mockRejectedValue(new Error('Delete failed'));
 
       const request = new NextRequest('http://localhost');
