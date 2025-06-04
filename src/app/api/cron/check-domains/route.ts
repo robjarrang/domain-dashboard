@@ -2,14 +2,13 @@ import { prisma } from '@/lib/prisma';
 import { checkDKIM, checkSPF, checkDMARC } from '@/utils/dns';
 import { NextResponse } from 'next/server';
 
-// Vercel cron jobs require the CRON_SECRET environment variable and
-// expect requests to include `Authorization: Bearer <CRON_SECRET>`
+// Vercel cron jobs are protected by a secret header
 const CRON_SECRET = process.env.CRON_SECRET;
 
 export async function GET(request: Request) {
   // Verify the request is from Vercel Cron
   const authHeader = request.headers.get('Authorization');
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${CRON_SECRET}`) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 
@@ -23,7 +22,7 @@ export async function GET(request: Request) {
         checkDMARC(domain.name),
       ]);
 
-      const updated = await prisma.domain.update({
+      await prisma.domain.update({
         where: { id: domain.id },
         data: {
           dkim: dkimResult.details ? `${dkimResult.value} (${dkimResult.details})` : dkimResult.value,
@@ -33,19 +32,6 @@ export async function GET(request: Request) {
           spfStatus: spfResult.status,
           dmarcStatus: dmarcResult.status,
           lastChecked: new Date(),
-        },
-      });
-
-      await prisma.domainCheck.create({
-        data: {
-          domainId: updated.id,
-          dkim: updated.dkim,
-          spf: updated.spf,
-          dmarc: updated.dmarc,
-          dkimStatus: updated.dkimStatus,
-          spfStatus: updated.spfStatus,
-          dmarcStatus: updated.dmarcStatus,
-          checkedAt: updated.lastChecked,
         },
       });
     }

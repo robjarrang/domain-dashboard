@@ -40,18 +40,4 @@ model Domain {
   updatedAt          DateTime @updatedAt
   espId              String?
   esp                Esp?     @relation(fields: [espId], references: [id])
-  checks             DomainCheck[]
-}
-
-model DomainCheck {
-  id          String   @id @default(cuid())
-  domainId    String
-  domain      Domain   @relation(fields: [domainId], references: [id])
-  dkim        String?
-  spf         String?
-  dmarc       String?
-  dkimStatus  String?
-  spfStatus   String?
-  dmarcStatus String?
-  checkedAt   DateTime @default(now())
 }

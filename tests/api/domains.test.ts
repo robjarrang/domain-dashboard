@@ -34,7 +34,6 @@ describe('Domain API Endpoints', () => {
         spf: mockDNSResult.value,
         dmarc: mockDNSResult.value,
       });
-      (prisma.domainCheck.create as jest.Mock).mockResolvedValue({});
 
       const request = new NextRequest('http://localhost');
       const response = await GET(request, { params: { id: '123' } });
@@ -47,7 +46,6 @@ describe('Domain API Endpoints', () => {
       expect(prisma.domain.findUnique).toHaveBeenCalledWith({
         where: { id: '123' }
       });
-      expect(prisma.domainCheck.create).toHaveBeenCalled();
     });
 
     test('should return 404 for non-existent domain', async () => {
@@ -65,7 +63,6 @@ describe('Domain API Endpoints', () => {
   describe('DELETE /api/domains/[id]', () => {
     test('should delete domain successfully', async () => {
       // Explicitly resolve the delete operation
-      (prisma.domain.findUnique as jest.Mock).mockResolvedValueOnce({ id: '123' });
       (prisma.domain.delete as jest.Mock).mockResolvedValueOnce({});
 
       const request = new NextRequest('http://localhost');
@@ -79,7 +76,6 @@ describe('Domain API Endpoints', () => {
     });
 
     test('should handle deletion error', async () => {
-      (prisma.domain.findUnique as jest.Mock).mockResolvedValueOnce({ id: '123' });
       (prisma.domain.delete as jest.Mock).mockRejectedValue(new Error('Delete failed'));
 
       const request = new NextRequest('http://localhost');
@@ -127,23 +123,6 @@ describe('Domain API Endpoints', () => {
       expect(response.status).toBe(400);
       const data = await response.json();
       expect(data).toHaveProperty('error', 'dismissedAdvisories must be an array');
-    });
-  });
-
-  describe('GET /api/domains/[id]/history', () => {
-    test('should return history entries', async () => {
-      (prisma.domainCheck.findMany as jest.Mock).mockResolvedValue([
-        { id: '1', checkedAt: new Date().toISOString() },
-      ]);
-      const { GET } = await import('@/app/api/domains/[id]/history/route');
-
-      const request = new NextRequest('http://localhost');
-      const response = await GET(request, { params: { id: '123' } });
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.length).toBe(1);
-      expect(prisma.domainCheck.findMany).toHaveBeenCalled();
     });
   });
 });

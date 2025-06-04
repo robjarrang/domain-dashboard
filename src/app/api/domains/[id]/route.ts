@@ -52,19 +52,6 @@ export async function GET(
       },
     });
 
-    await prisma.domainCheck.create({
-      data: {
-        domainId: updatedDomain.id,
-        dkim: updatedDomain.dkim,
-        spf: updatedDomain.spf,
-        dmarc: updatedDomain.dmarc,
-        dkimStatus: updatedDomain.dkimStatus,
-        spfStatus: updatedDomain.spfStatus,
-        dmarcStatus: updatedDomain.dmarcStatus,
-        checkedAt: updatedDomain.lastChecked,
-      },
-    });
-
     return NextResponse.json({
       ...updatedDomain,
       lastChecked: updatedDomain.lastChecked.toISOString(),

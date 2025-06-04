@@ -14,29 +14,13 @@ async function updateDomainRecords() {
         checkDMARC(domain.name),
       ]);
 
-      const updated = await prisma.domain.update({
+      await prisma.domain.update({
         where: { id: domain.id },
         data: {
           dkim: dkimResult.details ? `${dkimResult.value} (${dkimResult.details})` : dkimResult.value,
           spf: spfResult.details ? `${spfResult.value} (${spfResult.details})` : spfResult.value,
           dmarc: dmarcResult.details ? `${dmarcResult.value} (${dmarcResult.details})` : dmarcResult.value,
-          dkimStatus: dkimResult.status,
-          spfStatus: spfResult.status,
-          dmarcStatus: dmarcResult.status,
           lastChecked: new Date(),
-        },
-      });
-
-      await prisma.domainCheck.create({
-        data: {
-          domainId: updated.id,
-          dkim: updated.dkim,
-          spf: updated.spf,
-          dmarc: updated.dmarc,
-          dkimStatus: updated.dkimStatus,
-          spfStatus: updated.spfStatus,
-          dmarcStatus: updated.dmarcStatus,
-          checkedAt: updated.lastChecked,
         },
       });
       
