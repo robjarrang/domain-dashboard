@@ -22,7 +22,17 @@ describe('Cron Check Domains API', () => {
       { id: '1', name: 'example.com', dkimSelector: 'selector' },
     ];
     (prisma.domain.findMany as jest.Mock).mockResolvedValue(mockDomains);
-    (prisma.domain.update as jest.Mock).mockResolvedValue({});
+    (prisma.domain.update as jest.Mock).mockResolvedValue({
+      id: '1',
+      dkim: 'dkim',
+      spf: 'spf',
+      dmarc: 'dmarc',
+      dkimStatus: 'success',
+      spfStatus: 'success',
+      dmarcStatus: 'success',
+      lastChecked: new Date(),
+    });
+    (prisma.domainCheck.create as jest.Mock).mockResolvedValue({});
     (checkDKIM as jest.Mock).mockResolvedValue({ status: 'success', value: 'dkim' });
     (checkSPF as jest.Mock).mockResolvedValue({ status: 'success', value: 'spf' });
     (checkDMARC as jest.Mock).mockResolvedValue({ status: 'success', value: 'dmarc' });
@@ -37,6 +47,7 @@ describe('Cron Check Domains API', () => {
     expect(data).toEqual({ success: true, message: 'Domains checked successfully' });
     expect(prisma.domain.findMany).toHaveBeenCalled();
     expect(prisma.domain.update).toHaveBeenCalled();
+    expect(prisma.domainCheck.create).toHaveBeenCalled();
   });
 
   test('returns 401 when secret is missing', async () => {
