@@ -2,13 +2,14 @@ import { prisma } from '@/lib/prisma';
 import { checkDKIM, checkSPF, checkDMARC } from '@/utils/dns';
 import { NextResponse } from 'next/server';
 
-// Vercel cron jobs are protected by a secret header
+// Vercel cron jobs require the CRON_SECRET environment variable and
+// expect requests to include `Authorization: Bearer <CRON_SECRET>`
 const CRON_SECRET = process.env.CRON_SECRET;
 
 export async function GET(request: Request) {
   // Verify the request is from Vercel Cron
   const authHeader = request.headers.get('Authorization');
-  if (authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 
