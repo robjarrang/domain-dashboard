@@ -23,7 +23,7 @@ export async function GET(request: Request) {
         checkDMARC(domain.name),
       ]);
 
-      await prisma.domain.update({
+      const updated = await prisma.domain.update({
         where: { id: domain.id },
         data: {
           dkim: dkimResult.details ? `${dkimResult.value} (${dkimResult.details})` : dkimResult.value,
@@ -33,6 +33,19 @@ export async function GET(request: Request) {
           spfStatus: spfResult.status,
           dmarcStatus: dmarcResult.status,
           lastChecked: new Date(),
+        },
+      });
+
+      await prisma.domainCheck.create({
+        data: {
+          domainId: updated.id,
+          dkim: updated.dkim,
+          spf: updated.spf,
+          dmarc: updated.dmarc,
+          dkimStatus: updated.dkimStatus,
+          spfStatus: updated.spfStatus,
+          dmarcStatus: updated.dmarcStatus,
+          checkedAt: updated.lastChecked,
         },
       });
     }

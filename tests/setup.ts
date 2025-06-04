@@ -39,6 +39,10 @@ jest.mock('@/lib/prisma', () => ({
       update: jest.fn(),
       delete: jest.fn(),
     },
+    domainCheck: {
+      create: jest.fn(),
+      findMany: jest.fn(),
+    },
   },
 }));
 

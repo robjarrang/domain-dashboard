@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
   ChevronDownIcon, 
   ArrowPathIcon,
   TrashIcon,
@@ -14,6 +14,7 @@ import {
   XCircleIcon,
   PencilIcon
 } from '@heroicons/react/24/outline';
+import DomainHistory from './DomainHistory';
 
 export type DNSStatus = 'success' | 'error' | 'not-configured' | 'advisory';
 
@@ -364,6 +365,7 @@ export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: Doma
                 <h4 className="font-semibold text-midnight-navy mb-3">DMARC Record</h4>
                 {formatRecord(domain.dmarc, domain.dmarcStatus, 'dmarc')}
               </div>
+              <DomainHistory domainId={domain.id} />
             </div>
           </motion.div>
         )}
