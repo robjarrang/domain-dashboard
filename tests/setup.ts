@@ -20,10 +20,23 @@ jest.mock('next/server', () => ({
 // Mock Prisma
 jest.mock('@/lib/prisma', () => ({
   prisma: {
+    $transaction: jest.fn(async (callback: any) => callback({
+      domain: {
+        update: jest.fn(),
+      },
+      dNSRecordHistory: {
+        createMany: jest.fn(),
+      },
+    })),
     domain: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+    },
+    dNSRecordHistory: {
+      findMany: jest.fn(),
+      createMany: jest.fn(),
     },
   },
 }));

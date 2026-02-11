@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { checkDKIM, checkSPF, checkDMARC } from '@/utils/dns';
+import { updateDomainWithHistory } from '@/lib/domain-dns';
 import { NextResponse } from 'next/server';
 
 // Vercel cron jobs are protected by a secret header
@@ -22,17 +23,10 @@ export async function GET(request: Request) {
         checkDMARC(domain.name),
       ]);
 
-      await prisma.domain.update({
-        where: { id: domain.id },
-        data: {
-          dkim: dkimResult.details ? `${dkimResult.value} (${dkimResult.details})` : dkimResult.value,
-          spf: spfResult.details ? `${spfResult.value} (${spfResult.details})` : spfResult.value,
-          dmarc: dmarcResult.details ? `${dmarcResult.value} (${dmarcResult.details})` : dmarcResult.value,
-          dkimStatus: dkimResult.status,
-          spfStatus: spfResult.status,
-          dmarcStatus: dmarcResult.status,
-          lastChecked: new Date(),
-        },
+      await updateDomainWithHistory(domain, {
+        dkim: dkimResult,
+        spf: spfResult,
+        dmarc: dmarcResult,
       });
     }
 

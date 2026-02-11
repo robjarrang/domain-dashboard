@@ -15,6 +15,9 @@ describe('Domain API Endpoints', () => {
         id: '123',
         name: 'test.com',
         dkimSelector: 'selector',
+        dkim: 'old-dkim',
+        spf: 'old-spf',
+        dmarc: 'old-dmarc',
         dismissedAdvisories: null,
         lastChecked: new Date(),
       };
@@ -43,9 +46,8 @@ describe('Domain API Endpoints', () => {
       expect(data).toHaveProperty('dkimStatus', 'success');
       expect(data).toHaveProperty('spfStatus', 'success');
       expect(data).toHaveProperty('dmarcStatus', 'success');
-      expect(prisma.domain.findUnique).toHaveBeenCalledWith({
-        where: { id: '123' }
-      });
+      expect(prisma.domain.findUnique).toHaveBeenCalledTimes(2);
+      expect(prisma.$transaction).toHaveBeenCalled();
     });
 
     test('should return 404 for non-existent domain', async () => {
@@ -62,6 +64,7 @@ describe('Domain API Endpoints', () => {
 
   describe('DELETE /api/domains/[id]', () => {
     test('should delete domain successfully', async () => {
+      (prisma.domain.findUnique as jest.Mock).mockResolvedValue({ id: '123' });
       // Explicitly resolve the delete operation
       (prisma.domain.delete as jest.Mock).mockResolvedValueOnce({});
 
@@ -76,6 +79,7 @@ describe('Domain API Endpoints', () => {
     });
 
     test('should handle deletion error', async () => {
+      (prisma.domain.findUnique as jest.Mock).mockResolvedValue({ id: '123' });
       (prisma.domain.delete as jest.Mock).mockRejectedValue(new Error('Delete failed'));
 
       const request = new NextRequest('http://localhost');
