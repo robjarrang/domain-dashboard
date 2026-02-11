@@ -36,6 +36,14 @@ export type DomainRecord = {
   } | null;
 };
 
+type DNSRecordHistoryItem = {
+  id: string;
+  recordType: 'DKIM' | 'SPF' | 'DMARC';
+  before: string | null;
+  after: string | null;
+  changedAt: string;
+};
+
 type DomainCardProps = {
   domain: DomainRecord;
   onRefresh: (id: string) => Promise<void>;
@@ -87,11 +95,55 @@ export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: Doma
   const [isOpen, setIsOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<DNSRecordHistoryItem[]>([]);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const fetchHistory = async () => {
+      try {
+        setIsHistoryLoading(true);
+        setHistoryError(null);
+
+        const response = await fetch(`/api/domains/${domain.id}/history`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load DNS record history');
+        }
+
+        setHistory(data);
+      } catch (historyFetchError) {
+        console.error('Failed to load DNS record history:', historyFetchError);
+        setHistoryError(
+          historyFetchError instanceof Error
+            ? historyFetchError.message
+            : 'Failed to load DNS record history'
+        );
+      } finally {
+        setIsHistoryLoading(false);
+      }
+    };
+
+    fetchHistory();
+  }, [domain.id, domain.lastChecked, isOpen]);
+
+  const formatHistoryValue = (value: string | null) => {
+    if (!value) {
+      return 'Not configured';
+    }
+
+    return value;
+  };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -363,6 +415,46 @@ export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: Doma
               <div>
                 <h4 className="font-semibold text-midnight-navy mb-3">DMARC Record</h4>
                 {formatRecord(domain.dmarc, domain.dmarcStatus, 'dmarc')}
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-midnight-navy mb-3">Record Change History</h4>
+                {isHistoryLoading ? (
+                  <p className="text-sm text-deep-teal">Loading history...</p>
+                ) : historyError ? (
+                  <p className="text-sm text-red-600">Unable to load change history right now. Please try refreshing.</p>
+                ) : history.length === 0 ? (
+                  <p className="text-sm text-gray-500">No DNS changes have been detected yet. History entries appear after a check finds a before/after record change.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {history.map((entry) => (
+                      <div key={entry.id} className="rounded-lg border border-soft-grey bg-white p-3">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <span className="rounded-full bg-ice-white px-2 py-1 text-xs font-semibold text-deep-teal">
+                            {entry.recordType}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(entry.changedAt).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="grid gap-2 md:grid-cols-2">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Before</p>
+                            <p className="mt-1 break-all font-mono text-sm text-midnight-navy">
+                              {formatHistoryValue(entry.before)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">After</p>
+                            <p className="mt-1 break-all font-mono text-sm text-midnight-navy">
+                              {formatHistoryValue(entry.after)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
