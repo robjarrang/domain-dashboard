@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { checkDKIM, checkSPF, checkDMARC } from '@/utils/dns';
+import { updateDomainWithHistory } from '@/lib/domain-dns';
 import { Prisma } from '@prisma/client';
 
 // Mark route as dynamic
@@ -39,18 +40,19 @@ export async function GET(
       domain.dismissedAdvisories.split(',').filter(Boolean) : 
       [];
 
-    const updatedDomain = await prisma.domain.update({
-      where: { id },
-      data: {
-        dkim: dkimResult.details ? `${dkimResult.value} (${dkimResult.details})` : dkimResult.value,
-        spf: spfResult.details ? `${spfResult.value} (${spfResult.details})` : spfResult.value,
-        dmarc: dmarcResult.details ? `${dmarcResult.value} (${dmarcResult.details})` : dmarcResult.value,
-        dkimStatus: dkimResult.status,
-        spfStatus: spfResult.status,
-        dmarcStatus: dmarcResult.status,
-        lastChecked: new Date(),
-      },
+    const formattedRecords = await updateDomainWithHistory(domain, {
+      dkim: dkimResult,
+      spf: spfResult,
+      dmarc: dmarcResult,
     });
+
+    const updatedDomain = await prisma.domain.findUnique({
+      where: { id },
+    });
+
+    if (!updatedDomain) {
+      return NextResponse.json({ error: 'Domain not found after update' }, { status: 404 });
+    }
 
     return NextResponse.json({
       ...updatedDomain,
@@ -59,6 +61,9 @@ export async function GET(
       dkimStatus: dkimResult.status,
       spfStatus: spfResult.status,
       dmarcStatus: dmarcResult.status,
+      dkim: formattedRecords.dkim,
+      spf: formattedRecords.spf,
+      dmarc: formattedRecords.dmarc,
     });
   } catch (_error) {
     console.error('Error fetching domain:', _error);

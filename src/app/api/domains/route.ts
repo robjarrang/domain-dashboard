@@ -1,10 +1,7 @@
 import { prisma } from '@/lib/prisma';
-import { checkDKIM, checkSPF, checkDMARC, type DNSCheckResult } from '@/utils/dns';
+import { checkDKIM, checkSPF, checkDMARC } from '@/utils/dns';
+import { formatDNSResult } from '@/lib/domain-dns';
 import { NextResponse } from 'next/server';
-
-function formatDNSResult(result: DNSCheckResult): string {
-  return result.details ? `${result.value} (${result.details})` : result.value;
-}
 
 export async function GET(_request: Request) {
   try {
