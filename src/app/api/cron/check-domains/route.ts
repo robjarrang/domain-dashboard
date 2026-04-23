@@ -7,8 +7,8 @@ import { NextResponse } from 'next/server';
 const CRON_SECRET = process.env.CRON_SECRET;
 
 // Allow the cron function to run long enough to check every domain.
-// Vercel caps this per plan; 300 is the max on Pro.
-export const maxDuration = 300;
+// Hobby plans cap Serverless Functions at 60s; Pro allows up to 300s.
+export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 async function checkOneDomain(domain: Awaited<ReturnType<typeof prisma.domain.findMany>>[number]) {
