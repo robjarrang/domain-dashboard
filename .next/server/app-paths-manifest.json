@@ -1,9 +1,9 @@
 {
   "/_not-found": "app/_not-found.js",
-  "/api/esps/route": "app/api/esps/route.js",
-  "/api/domains/route": "app/api/domains/route.js",
   "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/api/domains/route": "app/api/domains/route.js",
+  "/api/esps/route": "app/api/esps/route.js",
+  "/page": "app/page.js",
   "/api/cron/check-domains/route": "app/api/cron/check-domains/route.js",
-  "/api/domains/[id]/route": "app/api/domains/[id]/route.js",
-  "/page": "app/page.js"
+  "/api/domains/[id]/route": "app/api/domains/[id]/route.js"
 }

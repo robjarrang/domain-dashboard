@@ -5,7 +5,7 @@ import DomainCard from '@/components/DomainCard';
 import AddDomainForm from '@/components/AddDomainForm';
 import EditDomainForm from '@/components/EditDomainForm';
 import SearchFilter, { SortOption } from '@/components/SearchFilter';
-import StatusSummary from '@/components/StatusSummary';
+import StatusSummary, { HealthFilter, domainHealth, isStale } from '@/components/StatusSummary';
 import type { DomainRecord } from '@/components/DomainCard';
 
 type ESP = {
@@ -35,6 +35,7 @@ export default function Home() {
   const [selectedEspId, setSelectedEspId] = useState('');
   const [refreshProgress, setRefreshProgress] = useState<{ done: number; total: number } | null>(null);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [healthFilter, setHealthFilter] = useState<HealthFilter>('all');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const fetchDomains = async () => {
@@ -262,6 +263,13 @@ export default function Home() {
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const filteredDomains = domains.filter(domain => {
     if (selectedEspId && domain.espId !== selectedEspId) return false;
+    if (healthFilter !== 'all') {
+      if (healthFilter === 'stale') {
+        if (!isStale(domain)) return false;
+      } else if (domainHealth(domain) !== healthFilter) {
+        return false;
+      }
+    }
     if (!normalizedQuery) return true;
     const haystack = [
       domain.name,
@@ -334,21 +342,25 @@ export default function Home() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <button
-          type="button"
-          onClick={() => setIsAddingDomain(true)}
-          className="btn-primary inline-flex items-center gap-2"
-        >
-          <PlusIcon className="w-5 h-5" />
-          Add Domain
-        </button>
-        <div className="flex items-center gap-3 flex-wrap">
+      <section className="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="!text-3xl md:!text-4xl !mb-1">Email authentication at a glance</h1>
+          <p className="text-sm text-deep-teal/80 m-0">
+            Monitoring{' '}
+            <span className="font-semibold text-midnight-navy">
+              {domains.length} {domains.length === 1 ? 'domain' : 'domains'}
+            </span>
+            {' '}·{' '}
+            Press <kbd className="kbd">/</kbd> to search,{' '}
+            <kbd className="kbd">R</kbd> to refresh all
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={handleExportCsv}
             disabled={sortedDomains.length === 0}
-            className="btn-secondary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-secondary"
             title={sortedDomains.length === 0 ? 'No domains to export' : `Export ${sortedDomains.length} domains to CSV`}
           >
             <ArrowDownTrayIcon className="w-5 h-5" />
@@ -358,25 +370,39 @@ export default function Home() {
             type="button"
             onClick={handleRefreshAll}
             disabled={refreshProgress !== null || domains.length === 0}
-            className="btn-secondary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-secondary"
             title="Refresh all domains"
           >
             <ArrowPathIcon className={`w-5 h-5 ${refreshProgress ? 'animate-spin' : ''}`} />
             {refreshProgress
               ? `Refreshing ${refreshProgress.done}/${refreshProgress.total}\u2026`
-              : 'Refresh All'}
+              : 'Refresh all'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsAddingDomain(true)}
+            className="btn-primary"
+          >
+            <PlusIcon className="w-5 h-5" />
+            Add domain
           </button>
         </div>
-      </div>
+      </section>
 
       {refreshProgress && (
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-ice-white">
+        <div className="h-1 w-full overflow-hidden rounded-full bg-ice-white ring-1 ring-soft-grey">
           <div
-            className="h-full bg-primary transition-all duration-200"
+            className="h-full bg-gradient-to-r from-primary to-deep-teal transition-all duration-200"
             style={{ width: `${Math.round((refreshProgress.done / refreshProgress.total) * 100)}%` }}
           />
         </div>
       )}
+
+      <StatusSummary
+        domains={domains}
+        activeFilter={healthFilter}
+        onFilterChange={setHealthFilter}
+      />
 
       <SearchFilter 
         ref={searchInputRef}
@@ -389,28 +415,73 @@ export default function Home() {
         esps={esps}
       />
 
-      <StatusSummary domains={domains} />
-
       <div>
         {error && (
-          <div className="p-4 rounded-xl bg-red-50 border border-red-200 mb-4">
-            <p className="text-sm text-red-600">{error}</p>
+          <div className="p-4 rounded-xl bg-red-50 ring-1 ring-red-200 mb-4 flex items-start gap-3">
+            <svg className="w-5 h-5 text-red-600 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            <p className="text-sm text-red-700 m-0">{error}</p>
           </div>
         )}
 
         {isLoading ? (
-          <div className="text-center py-12">
-            <ArrowPathIcon className="w-8 h-8 animate-spin mx-auto text-primary" />
-            <p className="mt-2 text-deep-teal">Loading domains...</p>
+          <div className="space-y-4">
+            {[0, 1, 2].map(i => (
+              <div key={i} className="card p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1 space-y-3">
+                    <div className="skeleton h-5 w-48" />
+                    <div className="flex gap-2">
+                      <div className="skeleton h-6 w-20 rounded-full" />
+                      <div className="skeleton h-6 w-20 rounded-full" />
+                      <div className="skeleton h-6 w-20 rounded-full" />
+                    </div>
+                  </div>
+                  <div className="skeleton h-8 w-8 rounded-full" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : sortedDomains.length === 0 ? (
-          <div className="section-highlight text-center p-12">
-            <h2 className="text-xl font-medium text-white mb-2">No domains found</h2>
-            <p className="text-ice-white/80">
-              {searchQuery 
-                ? 'Try adjusting your search query'
-                : 'Add your first domain to get started'}
+          <div className="card p-12 text-center">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-ice-white ring-1 ring-primary/20 flex items-center justify-center mb-4">
+              <svg className="w-7 h-7 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.25V18a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 18V8.25m-18 0v-1.5A2.25 2.25 0 015.25 4.5h13.5A2.25 2.25 0 0121 6.75v1.5m-18 0h18M8.25 12h7.5" />
+              </svg>
+            </div>
+            <h2 className="!text-xl !mb-1">
+              {domains.length === 0 ? 'No domains yet' : 'No matches'}
+            </h2>
+            <p className="text-sm text-deep-teal/80 mb-5 m-0">
+              {domains.length === 0
+                ? 'Add your first domain to start monitoring DKIM, SPF and DMARC.'
+                : searchQuery || healthFilter !== 'all' || selectedEspId
+                  ? 'Try adjusting your search or clearing filters.'
+                  : 'No domains to display.'}
             </p>
+            {domains.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => setIsAddingDomain(true)}
+                className="btn-primary"
+              >
+                <PlusIcon className="w-5 h-5" />
+                Add your first domain
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setHealthFilter('all');
+                  setSelectedEspId('');
+                }}
+                className="btn-secondary"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-4">

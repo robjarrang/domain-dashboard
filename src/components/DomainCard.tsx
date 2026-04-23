@@ -86,6 +86,60 @@ const getStatusColor = (status?: DNSStatus, isDismissed?: boolean) => {
   }
 };
 
+// Compact, labeled status pill used in the card header.
+// Shows record type + a colour + icon so a user can scan at a glance
+// without having to remember the order of DKIM/SPF/DMARC icons.
+function StatusChip({
+  label,
+  status,
+  isLoading,
+  isDismissed,
+}: {
+  label: string;
+  status?: DNSStatus;
+  isLoading?: boolean;
+  isDismissed?: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <span className="status-chip status-chip-loading">
+        <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />
+        {label}
+      </span>
+    );
+  }
+  if (isDismissed || status === 'success') {
+    return (
+      <span className="status-chip status-chip-success">
+        <CheckCircleIcon className="w-3.5 h-3.5" />
+        {label}
+      </span>
+    );
+  }
+  if (status === 'advisory') {
+    return (
+      <span className="status-chip status-chip-advisory">
+        <InformationCircleIcon className="w-3.5 h-3.5" />
+        {label}
+      </span>
+    );
+  }
+  if (status === 'error') {
+    return (
+      <span className="status-chip status-chip-error">
+        <ExclamationTriangleIcon className="w-3.5 h-3.5" />
+        {label}
+      </span>
+    );
+  }
+  return (
+    <span className="status-chip status-chip-missing">
+      <XCircleIcon className="w-3.5 h-3.5" />
+      {label}
+    </span>
+  );
+}
+
 // Strip the trailing " (details)" that updateDomainWithHistory appends so we
 // can present / copy the raw DNS record value.
 function rawRecordValue(record: string | null): string {
@@ -309,10 +363,10 @@ export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: Doma
   };
 
   const StatusIndicators = () => (
-    <div className="flex items-center gap-1">
-      {getStatusIcon(domain.dkimStatus, isRefreshing, isDismissed('dkim'))}
-      {getStatusIcon(domain.spfStatus, isRefreshing, isDismissed('spf'))}
-      {getStatusIcon(domain.dmarcStatus, isRefreshing, isDismissed('dmarc'))}
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <StatusChip label="DKIM" status={domain.dkimStatus} isLoading={isRefreshing} isDismissed={isDismissed('dkim')} />
+      <StatusChip label="SPF" status={domain.spfStatus} isLoading={isRefreshing} isDismissed={isDismissed('spf')} />
+      <StatusChip label="DMARC" status={domain.dmarcStatus} isLoading={isRefreshing} isDismissed={isDismissed('dmarc')} />
     </div>
   );
 
@@ -361,43 +415,43 @@ export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: Doma
   }
 
   return (
-    <div className="card overflow-hidden mb-4">
+    <div className="card card-interactive overflow-hidden mb-4">
       <div 
-        className="flex items-center justify-between p-6 cursor-pointer" 
+        className="flex items-start md:items-center justify-between gap-4 p-5 md:p-6 cursor-pointer" 
         onClick={() => setIsOpen(!isOpen)}
       >
-        <div className="flex-1">
-          <div className="flex items-center gap-4">
-            <h3 className="font-semibold text-lg text-midnight-navy">{domain.name}</h3>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h3 className="font-semibold text-lg text-midnight-navy truncate">{domain.name}</h3>
             {domain.esp && (
-              <span className="px-2 py-0.5 rounded-full text-sm bg-ice-white text-deep-teal">
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-ice-white text-deep-teal ring-1 ring-inset ring-deep-teal/10">
                 {domain.esp.name}
               </span>
             )}
-            <StatusIndicators />
             {error && (
               <ExclamationCircleIcon className="w-5 h-5 text-red-500" title={error} />
             )}
           </div>
-          <p className="mt-2 text-sm text-deep-teal flex items-center gap-2">
-            <span>Last checked:</span>
+          <div className="mt-3 flex items-center gap-3 flex-wrap">
+            <StatusIndicators />
+            <span className="hidden sm:inline-block w-px h-4 bg-soft-grey" />
             <span
               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${stalenessClasses(getStaleness(domain.lastChecked))}`}
               title={new Date(domain.lastChecked).toLocaleString()}
             >
               {formatRelativeTime(domain.lastChecked)}
             </span>
-          </p>
+          </div>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onEdit(domain.id);
             }}
-            className="p-2.5 rounded-full text-deep-teal hover:text-primary hover:bg-ice-white transition-all duration-200"
+            className="btn-ghost"
             title="Edit domain"
           >
             <PencilIcon className="w-5 h-5" />
@@ -408,7 +462,7 @@ export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: Doma
               e.stopPropagation();
               handleDelete();
             }}
-            className="p-2.5 rounded-full text-deep-teal hover:text-red-600 hover:bg-red-50 transition-all duration-200"
+            className="btn-ghost hover:!text-red-600 hover:!bg-red-50"
             title="Delete domain"
           >
             <TrashIcon className="w-5 h-5" />
@@ -420,7 +474,7 @@ export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: Doma
               handleRefresh();
             }}
             disabled={isRefreshing}
-            className="p-2.5 rounded-full text-deep-teal hover:text-primary hover:bg-ice-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-ghost"
             title="Refresh DNS records"
           >
             <ArrowPathIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -428,7 +482,7 @@ export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: Doma
           <div onClick={(e) => e.stopPropagation()}>
             <DomainToolsMenu domain={domain.name} />
           </div>
-          <div className="p-2.5 rounded-full text-deep-teal">
+          <div className="p-2 text-deep-teal/60">
             {isOpen ? (
               <ChevronUpIcon className="w-5 h-5" />
             ) : (
@@ -447,20 +501,36 @@ export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: Doma
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="p-6 bg-ice-white space-y-6 border-t border-soft-grey">
-              <div className="flex items-center justify-end -mb-2">
+            <div className="p-6 bg-gradient-to-b from-ice-white to-white space-y-6 border-t border-soft-grey">
+              <div className="flex items-center justify-between gap-3 -mb-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-deep-teal/70">
+                  DNS records
+                </div>
                 <CopyButton value={buildAllRecordsBlock(domain)} label="Copy all records" />
               </div>
               <div>
-                <h4 className="font-semibold text-midnight-navy mb-3">DKIM Record ({domain.dkimSelector}._domainkey)</h4>
+                <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                  <h4 className="font-semibold text-midnight-navy m-0 text-base">
+                    DKIM <span className="font-mono text-xs font-normal text-deep-teal/70">{domain.dkimSelector}._domainkey</span>
+                  </h4>
+                  <StatusChip label="DKIM" status={domain.dkimStatus} isDismissed={isDismissed('dkim')} />
+                </div>
                 {formatRecord(domain.dkim, domain.dkimStatus, 'dkim')}
               </div>
               <div>
-                <h4 className="font-semibold text-midnight-navy mb-3">SPF Record</h4>
+                <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                  <h4 className="font-semibold text-midnight-navy m-0 text-base">SPF</h4>
+                  <StatusChip label="SPF" status={domain.spfStatus} isDismissed={isDismissed('spf')} />
+                </div>
                 {formatRecord(domain.spf, domain.spfStatus, 'spf')}
               </div>
               <div>
-                <h4 className="font-semibold text-midnight-navy mb-3">DMARC Record</h4>
+                <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                  <h4 className="font-semibold text-midnight-navy m-0 text-base">
+                    DMARC <span className="font-mono text-xs font-normal text-deep-teal/70">_dmarc</span>
+                  </h4>
+                  <StatusChip label="DMARC" status={domain.dmarcStatus} isDismissed={isDismissed('dmarc')} />
+                </div>
                 {formatRecord(domain.dmarc, domain.dmarcStatus, 'dmarc')}
                 {renderDmarcReportAddresses(domain.dmarc)}
               </div>

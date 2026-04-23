@@ -4,13 +4,17 @@ import { CheckCircleIcon, InformationCircleIcon, XCircleIcon, ClockIcon } from '
 import type { DomainRecord, DNSStatus } from '@/components/DomainCard';
 import { getStaleness } from '@/utils/time';
 
+export type HealthFilter = 'all' | 'healthy' | 'advisory' | 'misconfigured' | 'stale';
+
 type Props = {
   domains: DomainRecord[];
+  activeFilter: HealthFilter;
+  onFilterChange: (filter: HealthFilter) => void;
 };
 
 type DomainHealth = 'healthy' | 'advisory' | 'misconfigured' | 'unknown';
 
-function domainHealth(domain: DomainRecord): DomainHealth {
+export function domainHealth(domain: DomainRecord): DomainHealth {
   const statuses: (DNSStatus | undefined)[] = [domain.dkimStatus, domain.spfStatus, domain.dmarcStatus];
   if (statuses.some(s => s === 'error' || s === 'not-configured')) return 'misconfigured';
   if (statuses.some(s => s === 'advisory')) return 'advisory';
@@ -18,7 +22,11 @@ function domainHealth(domain: DomainRecord): DomainHealth {
   return 'unknown';
 }
 
-export default function StatusSummary({ domains }: Props) {
+export function isStale(domain: DomainRecord, now: Date = new Date()): boolean {
+  return getStaleness(domain.lastChecked, now) !== 'fresh';
+}
+
+export default function StatusSummary({ domains, activeFilter, onFilterChange }: Props) {
   if (domains.length === 0) return null;
 
   let healthy = 0;
@@ -33,58 +41,105 @@ export default function StatusSummary({ domains }: Props) {
       case 'advisory': advisory++; break;
       case 'misconfigured': misconfigured++; break;
     }
-    const s = getStaleness(d.lastChecked, now);
-    if (s !== 'fresh') stale++;
+    if (isStale(d, now)) stale++;
   }
 
-  const items: Array<{ key: string; label: string; count: number; icon: JSX.Element; className: string }> = [
+  type Tile = {
+    key: HealthFilter;
+    label: string;
+    count: number;
+    icon: JSX.Element;
+    accent: string;
+    numberClass: string;
+  };
+
+  const tiles: Tile[] = [
     {
       key: 'healthy',
       label: 'Healthy',
       count: healthy,
-      icon: <CheckCircleIcon className="w-5 h-5" />,
-      className: 'text-green-700 bg-green-50 ring-1 ring-green-600/10',
+      icon: <CheckCircleIcon className="w-5 h-5 text-green-600" />,
+      accent: 'ring-green-600/20 group-hover:ring-green-600/40',
+      numberClass: 'text-green-700',
     },
     {
       key: 'advisory',
-      label: 'With advisories',
+      label: 'Advisories',
       count: advisory,
-      icon: <InformationCircleIcon className="w-5 h-5" />,
-      className: 'text-deep-teal bg-ice-white ring-1 ring-deep-teal/10',
+      icon: <InformationCircleIcon className="w-5 h-5 text-deep-teal" />,
+      accent: 'ring-deep-teal/20 group-hover:ring-deep-teal/40',
+      numberClass: 'text-deep-teal',
     },
     {
       key: 'misconfigured',
       label: 'Misconfigured',
       count: misconfigured,
-      icon: <XCircleIcon className="w-5 h-5" />,
-      className: 'text-red-700 bg-red-50 ring-1 ring-red-600/10',
+      icon: <XCircleIcon className="w-5 h-5 text-red-600" />,
+      accent: 'ring-red-600/20 group-hover:ring-red-600/40',
+      numberClass: 'text-red-700',
     },
     {
       key: 'stale',
       label: 'Stale (>24h)',
       count: stale,
-      icon: <ClockIcon className="w-5 h-5" />,
-      className: 'text-amber-700 bg-amber-50 ring-1 ring-amber-600/10',
+      icon: <ClockIcon className="w-5 h-5 text-amber-600" />,
+      accent: 'ring-amber-600/20 group-hover:ring-amber-600/40',
+      numberClass: 'text-amber-700',
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      {items.map(item => (
-        <div
-          key={item.key}
-          className={`flex items-center gap-3 rounded-xl px-4 py-3 ${item.className}`}
-        >
-          {item.icon}
-          <div className="flex flex-col">
-            <span className="text-2xl font-semibold leading-none">{item.count}</span>
-            <span className="text-xs mt-1 opacity-80">{item.label}</span>
-          </div>
-        </div>
-      ))}
-      <div className="col-span-2 md:col-span-4 text-xs text-deep-teal/70">
-        {domains.length} {domains.length === 1 ? 'domain' : 'domains'} tracked · {summaryLabel(misconfigured, advisory)}
+    <div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {tiles.map(tile => {
+          const isActive = activeFilter === tile.key;
+          const isDisabled = tile.count === 0;
+          return (
+            <button
+              key={tile.key}
+              type="button"
+              onClick={() => {
+                if (isDisabled) return;
+                onFilterChange(isActive ? 'all' : tile.key);
+              }}
+              disabled={isDisabled}
+              aria-pressed={isActive}
+              className={`group relative flex items-center gap-3 rounded-2xl bg-white px-4 py-3 text-left transition-all duration-200 ring-1 ${
+                isActive
+                  ? 'ring-2 ring-primary shadow-[0_6px_18px_-8px_rgba(0,222,202,0.65)]'
+                  : `${tile.accent} shadow-[0_1px_2px_rgba(8,0,67,0.04)] hover:-translate-y-[1px] hover:shadow-md`
+              } ${isDisabled ? 'opacity-60 cursor-default hover:translate-y-0 hover:shadow-[0_1px_2px_rgba(8,0,67,0.04)]' : 'cursor-pointer'}`}
+            >
+              <div className="shrink-0">{tile.icon}</div>
+              <div className="flex flex-col min-w-0">
+                <span className={`text-2xl font-semibold leading-none ${tile.numberClass}`}>{tile.count}</span>
+                <span className="text-xs mt-1 text-deep-teal/80">{tile.label}</span>
+              </div>
+              {isActive && (
+                <span className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                  Filtered
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
+      <p className="mt-3 text-xs text-deep-teal/70">
+        {domains.length} {domains.length === 1 ? 'domain' : 'domains'} tracked ·{' '}
+        {summaryLabel(misconfigured, advisory)}
+        {activeFilter !== 'all' && (
+          <>
+            {' · '}
+            <button
+              type="button"
+              onClick={() => onFilterChange('all')}
+              className="text-primary hover:underline font-medium"
+            >
+              Clear filter
+            </button>
+          </>
+        )}
+      </p>
     </div>
   );
 }

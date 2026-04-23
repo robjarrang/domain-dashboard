@@ -2,51 +2,125 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --foreground-rgb: 8, 0, 67; /* Midnight Navy */
+    --background-rgb: 238, 242, 251; /* Ice White */
+  }
+
+  html {
+    font-family: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  body {
+    color: rgb(var(--foreground-rgb));
+    background:
+      radial-gradient(1100px 500px at 12% -10%, rgba(0, 222, 202, 0.08), transparent 60%),
+      radial-gradient(900px 450px at 110% 10%, rgba(0, 64, 99, 0.06), transparent 55%),
+      rgb(var(--background-rgb));
+    background-attachment: fixed;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: rgb(8, 0, 67);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  main h1 { @apply text-3xl md:text-4xl mb-6; }
+  h2 { @apply text-2xl md:text-3xl mb-5; }
+  h3 { @apply text-xl md:text-2xl mb-4; }
+  h4 { @apply text-lg md:text-xl mb-3; }
+
+  main p { @apply mb-4; }
+
+  hr, .divider {
+    @apply border-soft-grey;
+  }
+
+  *:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(238, 242, 251, 1), 0 0 0 4px rgba(0, 222, 202, 0.55);
+    border-radius: 0.5rem;
+  }
+
+  ::selection {
+    background: rgba(0, 222, 202, 0.3);
+  }
+}
+
 @layer components {
   .btn-primary {
-    @apply bg-primary text-white py-2.5 px-5 rounded-full hover:bg-primary-hover transition-all duration-200 shadow-sm hover:shadow-md;
+    @apply inline-flex items-center justify-center gap-2 bg-primary text-midnight-navy font-semibold py-2.5 px-5 rounded-full transition-all duration-200 shadow-[0_1px_0_rgba(8,0,67,0.04),0_4px_12px_-4px_rgba(0,222,202,0.6)] hover:bg-primary-hover hover:shadow-[0_1px_0_rgba(8,0,67,0.04),0_6px_18px_-6px_rgba(0,222,202,0.75)] hover:-translate-y-[1px] active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:translate-y-0;
   }
-  
+
   .btn-secondary {
-    @apply bg-ice-white text-midnight-navy py-2.5 px-5 rounded-full hover:bg-soft-grey/20 transition-all duration-200 shadow-sm hover:shadow-md border border-midnight-navy;
+    @apply inline-flex items-center justify-center gap-2 bg-white text-midnight-navy font-medium py-2.5 px-5 rounded-full transition-all duration-200 shadow-sm ring-1 ring-soft-grey hover:ring-midnight-navy/30 hover:shadow-md hover:-translate-y-[1px] active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-sm;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center p-2 rounded-full text-deep-teal hover:text-primary hover:bg-ice-white transition-all duration-200 focus-visible:bg-ice-white disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .card {
-    @apply bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-200;
+    @apply bg-white rounded-2xl ring-1 ring-soft-grey/70 shadow-[0_1px_2px_rgba(8,0,67,0.04)] transition-all duration-200;
+  }
+
+  .card-interactive {
+    @apply hover:ring-primary/40 hover:shadow-[0_8px_24px_-12px_rgba(8,0,67,0.18)] hover:-translate-y-[1px];
   }
 
   .section-highlight {
     @apply bg-midnight-navy text-white py-12 rounded-2xl;
   }
+
+  /* Small status chip used on dense rows (e.g. DomainCard header). */
+  .status-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide;
+  }
+  .status-chip-success {
+    @apply bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/15;
+  }
+  .status-chip-advisory {
+    @apply bg-ice-white text-deep-teal ring-1 ring-inset ring-deep-teal/15;
+  }
+  .status-chip-error {
+    @apply bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/15;
+  }
+  .status-chip-missing {
+    @apply bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/15;
+  }
+  .status-chip-loading {
+    @apply bg-ice-white text-deep-teal ring-1 ring-inset ring-deep-teal/15;
+  }
+
+  /* Keyboard shortcut badge. */
+  .kbd {
+    @apply inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 rounded-md bg-white text-[11px] font-mono font-semibold text-deep-teal ring-1 ring-soft-grey shadow-[0_1px_0_rgba(8,0,67,0.05)];
+  }
+
+  /* Skeleton shimmer for loading states. */
+  .skeleton {
+    @apply relative overflow-hidden bg-ice-white rounded-xl;
+  }
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  }
 }
 
-:root {
-  --foreground-rgb: 8, 0, 67; /* Midnight Navy */
-  --background-rgb: 238, 242, 251; /* Ice White */
+@keyframes skeleton-shimmer {
+  100% { transform: translateX(100%); }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  line-height: 1.75;
-}
-
-h1, h2, h3, h4, h5, h6 {
-  color: rgb(8, 0, 67); /* Midnight Navy for headings */
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-/* Content h1 gets margin, but header h1 doesn't */
-main h1 { @apply text-4xl mb-6; }
-h2 { @apply text-3xl mb-5; }
-h3 { @apply text-2xl mb-4; }
-h4 { @apply text-xl mb-3; }
-
-/* Only apply margin to paragraphs in the main content area */
-main p { @apply mb-4; }
-
-hr, .divider {
-  @apply border-soft-grey;
+/* Tame native select caret colour to match the brand. */
+select {
+  color-scheme: light;
 }

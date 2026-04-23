@@ -72,7 +72,7 @@ export default function DomainToolsMenu({ domain }: Props) {
           e.stopPropagation();
           setOpen(o => !o);
         }}
-        className="p-2.5 rounded-full text-deep-teal hover:text-primary hover:bg-ice-white transition-all duration-200"
+        className="btn-ghost"
         title="Open in external DNS tools"
         aria-haspopup="menu"
         aria-expanded={open}
