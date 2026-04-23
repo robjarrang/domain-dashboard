@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatRelativeTime, getStaleness, stalenessClasses } from '@/utils/time';
 import { 
   ChevronDownIcon, 
   ArrowPathIcon,
@@ -292,8 +293,14 @@ export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: Doma
               <ExclamationCircleIcon className="w-5 h-5 text-red-500" title={error} />
             )}
           </div>
-          <p className="mt-2 text-sm text-deep-teal">
-            Last checked: {new Date(domain.lastChecked).toLocaleString()}
+          <p className="mt-2 text-sm text-deep-teal flex items-center gap-2">
+            <span>Last checked:</span>
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${stalenessClasses(getStaleness(domain.lastChecked))}`}
+              title={new Date(domain.lastChecked).toLocaleString()}
+            >
+              {formatRelativeTime(domain.lastChecked)}
+            </span>
           </p>
         </div>
         

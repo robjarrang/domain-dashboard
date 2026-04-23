@@ -5,6 +5,7 @@ import DomainCard from '@/components/DomainCard';
 import AddDomainForm from '@/components/AddDomainForm';
 import EditDomainForm from '@/components/EditDomainForm';
 import SearchFilter, { SortOption } from '@/components/SearchFilter';
+import StatusSummary from '@/components/StatusSummary';
 import type { DomainRecord } from '@/components/DomainCard';
 
 type ESP = {
@@ -203,6 +204,8 @@ export default function Home() {
         onEspChange={setSelectedEspId}
         esps={esps}
       />
+
+      <StatusSummary domains={domains} />
 
       <div>
         {error && (
