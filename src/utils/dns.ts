@@ -9,8 +9,9 @@ export type DNSCheckResult = {
 const DNS_TIMEOUT = 5000; // 5 seconds timeout
 
 async function resolveTxtWithTimeout(hostname: string): Promise<string[][]> {
+  let timeoutHandle: NodeJS.Timeout | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error('DNS lookup timeout')), DNS_TIMEOUT);
+    timeoutHandle = setTimeout(() => reject(new Error('DNS lookup timeout')), DNS_TIMEOUT);
   });
 
   try {
@@ -24,6 +25,8 @@ async function resolveTxtWithTimeout(hostname: string): Promise<string[][]> {
       throw new Error('DNS lookup timed out after 5 seconds');
     }
     throw error;
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
   }
 }
 
