@@ -359,6 +359,8 @@ async function checkDMARC(domain: string): Promise<DNSCheckResult> {
     const summary: string[] = [`p=${tags.p}`];
     if (tags.sp) summary.push(`sp=${tags.sp}`);
     if (tags.pct) summary.push(`pct=${tags.pct}`);
+    if (tags.adkim) summary.push(`adkim=${tags.adkim}`);
+    if (tags.aspf) summary.push(`aspf=${tags.aspf}`);
 
     if (tags.p === 'none') {
       advisories.push('Monitor-only policy (p=none), no enforcement');
@@ -373,6 +375,13 @@ async function checkDMARC(domain: string): Promise<DNSCheckResult> {
 
     if (!tags.rua) {
       advisories.push('No aggregate report address (rua) configured');
+    }
+
+    if (tags.adkim && !['r', 's'].includes(tags.adkim.toLowerCase())) {
+      advisories.push(`Unknown DKIM alignment mode: ${tags.adkim}`);
+    }
+    if (tags.aspf && !['r', 's'].includes(tags.aspf.toLowerCase())) {
+      advisories.push(`Unknown SPF alignment mode: ${tags.aspf}`);
     }
 
     if (advisories.length > 0) {

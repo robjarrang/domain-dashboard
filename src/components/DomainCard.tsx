@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatRelativeTime, getStaleness, stalenessClasses } from '@/utils/time';
 import CopyButton from '@/components/CopyButton';
+import DomainToolsMenu from '@/components/DomainToolsMenu';
 import { 
   ChevronDownIcon, 
   ArrowPathIcon,
@@ -84,6 +85,86 @@ const getStatusColor = (status?: DNSStatus, isDismissed?: boolean) => {
       return 'text-red-700 bg-red-50 ring-1 ring-red-600/10';
   }
 };
+
+// Strip the trailing " (details)" that updateDomainWithHistory appends so we
+// can present / copy the raw DNS record value.
+function rawRecordValue(record: string | null): string {
+  if (!record) return '';
+  const idx = record.lastIndexOf(' (');
+  return idx === -1 ? record : record.slice(0, idx);
+}
+
+function buildAllRecordsBlock(domain: DomainRecord): string {
+  const lines: string[] = [`# ${domain.name}`];
+  const dkim = rawRecordValue(domain.dkim);
+  const spf = rawRecordValue(domain.spf);
+  const dmarc = rawRecordValue(domain.dmarc);
+  lines.push('', `; DKIM — ${domain.dkimSelector}._domainkey.${domain.name}`);
+  lines.push(dkim || '(not configured)');
+  lines.push('', `; SPF — ${domain.name}`);
+  lines.push(spf || '(not configured)');
+  lines.push('', `; DMARC — _dmarc.${domain.name}`);
+  lines.push(dmarc || '(not configured)');
+  return lines.join('\n');
+}
+
+function parseDmarcReportAddresses(dmarc: string | null): { rua: string[]; ruf: string[] } {
+  if (!dmarc) return { rua: [], ruf: [] };
+  const raw = rawRecordValue(dmarc);
+  const tags: Record<string, string> = {};
+  for (const segment of raw.split(';')) {
+    const eq = segment.indexOf('=');
+    if (eq === -1) continue;
+    const key = segment.slice(0, eq).trim().toLowerCase();
+    tags[key] = segment.slice(eq + 1).trim();
+  }
+  const split = (value?: string): string[] =>
+    value
+      ? value.split(',').map(v => v.trim()).filter(Boolean)
+      : [];
+  return { rua: split(tags.rua), ruf: split(tags.ruf) };
+}
+
+function renderDmarcReportAddresses(dmarc: string | null) {
+  const { rua, ruf } = parseDmarcReportAddresses(dmarc);
+  if (rua.length === 0 && ruf.length === 0) return null;
+  const renderList = (addrs: string[]) => (
+    <ul className="mt-1 space-y-1">
+      {addrs.map(addr => {
+        const href = addr.startsWith('mailto:') || addr.startsWith('https:') ? addr : addr;
+        const display = addr.replace(/^mailto:/, '');
+        return (
+          <li key={addr} className="text-sm">
+            <a
+              href={href}
+              target={addr.startsWith('https:') ? '_blank' : undefined}
+              rel="noreferrer noopener"
+              className="font-mono text-primary hover:underline break-all"
+            >
+              {display}
+            </a>
+          </li>
+        );
+      })}
+    </ul>
+  );
+  return (
+    <div className="mt-3 grid gap-3 md:grid-cols-2">
+      {rua.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-deep-teal/70">Aggregate reports (rua)</p>
+          {renderList(rua)}
+        </div>
+      )}
+      {ruf.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-deep-teal/70">Forensic reports (ruf)</p>
+          {renderList(ruf)}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: DomainCardProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -342,7 +423,10 @@ export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: Doma
             title="Refresh DNS records"
           >
             <ArrowPathIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-          </button>
+          </butonClick={(e) => e.stopPropagation()}>
+            <DomainToolsMenu domain={domain.name} />
+          </div>
+          <div ton>
           <div className="p-2.5 rounded-full text-deep-teal">
             {isOpen ? (
               <ChevronUpIcon className="w-5 h-5" />
@@ -363,6 +447,9 @@ export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: Doma
             className="overflow-hidden"
           >
             <div className="p-6 bg-ice-white space-y-6 border-t border-soft-grey">
+              <div className="flex items-center justify-end -mb-2">
+                <CopyButton value={buildAllRecordsBlock(domain)} label="Copy all records" />
+              </div>
               <div>
                 <h4 className="font-semibold text-midnight-navy mb-3">DKIM Record ({domain.dkimSelector}._domainkey)</h4>
                 {formatRecord(domain.dkim, domain.dkimStatus, 'dkim')}
@@ -374,6 +461,7 @@ export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: Doma
               <div>
                 <h4 className="font-semibold text-midnight-navy mb-3">DMARC Record</h4>
                 {formatRecord(domain.dmarc, domain.dmarcStatus, 'dmarc')}
+                {renderDmarcReportAddresses(domain.dmarc)}
               </div>
             </div>
           </motion.div>

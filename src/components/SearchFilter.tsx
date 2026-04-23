@@ -1,5 +1,6 @@
 'use client';
 
+import { forwardRef } from 'react';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { ArrowsUpDownIcon } from '@heroicons/react/24/outline';
 
@@ -15,15 +16,15 @@ type SearchFilterProps = {
   esps: Array<{ id: string; name: string; }>;
 };
 
-export default function SearchFilter({ 
-  searchQuery, 
-  onSearchChange, 
-  sortOption, 
+const SearchFilter = forwardRef<HTMLInputElement, SearchFilterProps>(function SearchFilter({
+  searchQuery,
+  onSearchChange,
+  sortOption,
   onSortChange,
   selectedEspId,
   onEspChange,
-  esps
-}: SearchFilterProps) {
+  esps,
+}, ref) {
   return (
     <div className="flex flex-col md:flex-row gap-4 mb-6">
       <div className="relative flex-grow">
@@ -31,13 +32,14 @@ export default function SearchFilter({
           <MagnifyingGlassIcon className="h-5 w-5 text-deep-teal" aria-hidden="true" />
         </div>
         <input
+          ref={ref}
           type="text"
           name="search"
           id="search"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           className="block w-full rounded-xl border-soft-grey pl-10 py-3 shadow-sm focus:border-primary focus:ring-primary transition-all duration-200 placeholder:text-deep-teal/50"
-          placeholder="Search domains..."
+          placeholder="Search by domain, ESP, or record contents…"
         />
       </div>
 
@@ -86,4 +88,6 @@ export default function SearchFilter({
       </div>
     </div>
   );
-}
+});
+
+export default SearchFilter;

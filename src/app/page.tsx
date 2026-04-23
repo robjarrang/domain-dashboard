@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { PlusIcon, ArrowPathIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import DomainCard from '@/components/DomainCard';
 import AddDomainForm from '@/components/AddDomainForm';
@@ -35,6 +35,7 @@ export default function Home() {
   const [selectedEspId, setSelectedEspId] = useState('');
   const [refreshProgress, setRefreshProgress] = useState<{ done: number; total: number } | null>(null);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const fetchDomains = async () => {
     try {
@@ -257,11 +258,24 @@ export default function Home() {
     URL.revokeObjectURL(url);
   };
 
-  // Filter domains based on search query and ESP
-  const filteredDomains = domains.filter(domain => 
-    domain.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-    (!selectedEspId || domain.espId === selectedEspId)
-  );
+  // Filter domains: matches domain name, ESP name, or record contents (case-insensitive).
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredDomains = domains.filter(domain => {
+    if (selectedEspId && domain.espId !== selectedEspId) return false;
+    if (!normalizedQuery) return true;
+    const haystack = [
+      domain.name,
+      domain.esp?.name,
+      domain.dkim,
+      domain.spf,
+      domain.dmarc,
+      domain.dkimSelector,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return haystack.includes(normalizedQuery);
+  });
 
   // Sort domains based on selected sort option
   const sortedDomains = [...filteredDomains].sort((a, b) => {
@@ -279,6 +293,45 @@ export default function Home() {
     }
   });
 
+  // Keyboard shortcuts: `/` focuses search, `Esc` clears+blurs it, `r` triggers refresh all.
+  const isModalOpen = isAddingDomain || editingDomain !== null;
+  const handleRefreshAllLatest = useCallback(() => {
+    handleRefreshAll();
+  }, [handleRefreshAll]);
+
+  useEffect(() => {
+    if (isModalOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tagName = target?.tagName;
+      const isEditable =
+        tagName === 'INPUT' ||
+        tagName === 'TEXTAREA' ||
+        tagName === 'SELECT' ||
+        target?.isContentEditable;
+
+      if (e.key === '/' && !isEditable && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+      if (e.key === 'Escape' && target === searchInputRef.current) {
+        setSearchQuery('');
+        searchInputRef.current?.blur();
+        return;
+      }
+      if ((e.key === 'r' || e.key === 'R') && !isEditable && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        if (!refreshProgress && domains.length > 0) {
+          handleRefreshAllLatest();
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isModalOpen, refreshProgress, domains.length, handleRefreshAllLatest]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -287,6 +340,7 @@ export default function Home() {
           onClick={() => setIsAddingDomain(true)}
           className="btn-primary inline-flex items-center gap-2"
         >
+        ref={searchInputRef}
           <PlusIcon className="w-5 h-5" />
           Add Domain
         </button>
