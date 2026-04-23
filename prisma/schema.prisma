@@ -9,9 +9,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 /// @map("esp")
@@ -41,23 +40,4 @@ model Domain {
   updatedAt           DateTime           @updatedAt
   espId               String?
   esp                 Esp?               @relation(fields: [espId], references: [id])
-  dnsRecordHistories  DNSRecordHistory[]
-}
-
-enum DNSRecordType {
-  DKIM
-  SPF
-  DMARC
-}
-
-model DNSRecordHistory {
-  id         String        @id @default(cuid())
-  domainId   String
-  domain     Domain        @relation(fields: [domainId], references: [id], onDelete: Cascade)
-  recordType DNSRecordType
-  before     String?
-  after      String?
-  changedAt  DateTime      @default(now())
-
-  @@index([domainId, changedAt(sort: Desc)])
 }
