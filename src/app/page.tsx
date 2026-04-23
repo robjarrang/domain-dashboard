@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { PlusIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, ArrowPathIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import DomainCard from '@/components/DomainCard';
 import AddDomainForm from '@/components/AddDomainForm';
 import EditDomainForm from '@/components/EditDomainForm';
@@ -13,6 +13,16 @@ type ESP = {
   name: string;
 };
 
+const PREFS_STORAGE_KEY = 'domain-dashboard:prefs:v1';
+
+type StoredPrefs = {
+  searchQuery?: string;
+  sortOption?: SortOption;
+  selectedEspId?: string;
+};
+
+const REFRESH_CONCURRENCY = 4;
+
 export default function Home() {
   const [domains, setDomains] = useState<DomainRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -23,6 +33,8 @@ export default function Home() {
   const [sortOption, setSortOption] = useState<SortOption>('name-asc');
   const [esps, setEsps] = useState<ESP[]>([]);
   const [selectedEspId, setSelectedEspId] = useState('');
+  const [refreshProgress, setRefreshProgress] = useState<{ done: number; total: number } | null>(null);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
 
   const fetchDomains = async () => {
     try {
@@ -62,6 +74,33 @@ export default function Home() {
     fetchDomains();
     fetchEsps();
   }, []);
+
+  // Load persisted prefs once on mount.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(PREFS_STORAGE_KEY);
+      if (raw) {
+        const prefs = JSON.parse(raw) as StoredPrefs;
+        if (typeof prefs.searchQuery === 'string') setSearchQuery(prefs.searchQuery);
+        if (prefs.sortOption) setSortOption(prefs.sortOption);
+        if (typeof prefs.selectedEspId === 'string') setSelectedEspId(prefs.selectedEspId);
+      }
+    } catch {
+      // Ignore corrupt prefs.
+    }
+    setPrefsLoaded(true);
+  }, []);
+
+  // Persist whenever they change (after initial load).
+  useEffect(() => {
+    if (!prefsLoaded) return;
+    try {
+      const prefs: StoredPrefs = { searchQuery, sortOption, selectedEspId };
+      window.localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs));
+    } catch {
+      // Ignore storage errors (quota, disabled storage, etc.).
+    }
+  }, [prefsLoaded, searchQuery, sortOption, selectedEspId]);
 
   const handleAddDomain = async (domain: Omit<DomainRecord, 'id' | 'lastChecked'>) => {
     const response = await fetch('/api/domains', {
@@ -134,20 +173,88 @@ export default function Home() {
   };
 
   const handleRefreshAll = async () => {
-    setIsLoading(true);
+    if (domains.length === 0) return;
     setError(null);
-    try {
-      // Refresh each domain sequentially to avoid overwhelming the DNS servers
-      for (const domain of domains) {
-        await handleRefreshDomain(domain.id);
+    setRefreshProgress({ done: 0, total: domains.length });
+
+    const queue = [...domains];
+    const failures: string[] = [];
+
+    const worker = async () => {
+      while (queue.length > 0) {
+        const next = queue.shift();
+        if (!next) return;
+        try {
+          const response = await fetch(`/api/domains/${next.id}`, { method: 'GET' });
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || `Failed to refresh ${next.name}`);
+          }
+        } catch (err) {
+          console.error('Refresh failed for', next.name, err);
+          failures.push(next.name);
+        } finally {
+          setRefreshProgress(prev => prev ? { ...prev, done: prev.done + 1 } : prev);
+        }
       }
+    };
+
+    try {
+      const workers = Array.from(
+        { length: Math.min(REFRESH_CONCURRENCY, domains.length) },
+        () => worker(),
+      );
+      await Promise.all(workers);
       await fetchDomains();
-    } catch (error) {
-      console.error('Failed to refresh all domains:', error);
-      setError(error instanceof Error ? error.message : 'Failed to refresh all domains');
+      if (failures.length > 0) {
+        setError(`Refresh finished with ${failures.length} failure${failures.length === 1 ? '' : 's'}: ${failures.join(', ')}`);
+      }
     } finally {
-      setIsLoading(false);
+      setRefreshProgress(null);
     }
+  };
+
+  const handleExportCsv = () => {
+    if (sortedDomains.length === 0) return;
+    const header = [
+      'domain',
+      'esp',
+      'dkim_selector',
+      'dkim_status',
+      'dkim_value',
+      'spf_status',
+      'spf_value',
+      'dmarc_status',
+      'dmarc_value',
+      'last_checked',
+    ];
+    const escape = (raw: unknown): string => {
+      const s = raw == null ? '' : String(raw);
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = sortedDomains.map(d => [
+      d.name,
+      d.esp?.name ?? '',
+      d.dkimSelector,
+      d.dkimStatus ?? '',
+      d.dkim ?? '',
+      d.spfStatus ?? '',
+      d.spf ?? '',
+      d.dmarcStatus ?? '',
+      d.dmarc ?? '',
+      d.lastChecked,
+    ].map(escape).join(','));
+    const csv = [header.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
+    a.download = `domain-dashboard-${stamp}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   // Filter domains based on search query and ESP
@@ -174,7 +281,7 @@ export default function Home() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <button
           type="button"
           onClick={() => setIsAddingDomain(true)}
@@ -183,17 +290,40 @@ export default function Home() {
           <PlusIcon className="w-5 h-5" />
           Add Domain
         </button>
-        <button
-          type="button"
-          onClick={handleRefreshAll}
-          disabled={isLoading}
-          className="btn-secondary inline-flex items-center gap-2"
-          title="Refresh all domains"
-        >
-          <ArrowPathIcon className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh All
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={sortedDomains.length === 0}
+            className="btn-secondary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={sortedDomains.length === 0 ? 'No domains to export' : `Export ${sortedDomains.length} domains to CSV`}
+          >
+            <ArrowDownTrayIcon className="w-5 h-5" />
+            Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={handleRefreshAll}
+            disabled={refreshProgress !== null || domains.length === 0}
+            className="btn-secondary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Refresh all domains"
+          >
+            <ArrowPathIcon className={`w-5 h-5 ${refreshProgress ? 'animate-spin' : ''}`} />
+            {refreshProgress
+              ? `Refreshing ${refreshProgress.done}/${refreshProgress.total}\u2026`
+              : 'Refresh All'}
+          </button>
+        </div>
       </div>
+
+      {refreshProgress && (
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-ice-white">
+          <div
+            className="h-full bg-primary transition-all duration-200"
+            style={{ width: `${Math.round((refreshProgress.done / refreshProgress.total) * 100)}%` }}
+          />
+        </div>
+      )}
 
       <SearchFilter 
         searchQuery={searchQuery} 

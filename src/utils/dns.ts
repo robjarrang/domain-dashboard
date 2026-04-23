@@ -1,4 +1,5 @@
 import { promises as dns } from 'dns';
+import { createPublicKey } from 'crypto';
 
 export type DNSCheckResult = {
   status: 'success' | 'error' | 'not-configured' | 'advisory';
@@ -57,10 +58,35 @@ async function checkDKIM(domain: string, selector: string): Promise<DNSCheckResu
         details: `Missing required tags: ${missingTags.join(', ')}`
       };
     }
+const advisories: string[] = [];
+    const summary: string[] = [];
+
+    const keyInfo = parseDkimKey(dkimRecord);
+    if (keyInfo.revoked) {
+      advisories.push('Revoked key (p= is empty)');
+    } else if (keyInfo.bits) {
+      summary.push(`${keyInfo.bits}-bit ${keyInfo.algorithm ?? 'key'}`);
+      if (keyInfo.bits < 1024) {
+        advisories.push(`Key is only ${keyInfo.bits} bits (insecure, <1024)`);
+      } else if (keyInfo.bits < 2048) {
+        advisories.push(`Key is ${keyInfo.bits} bits (2048-bit recommended)`);
+      }
+    } else if (keyInfo.parseError) {
+      advisories.push('Could not parse public key');
+    }
+
+    if (advisories.length > 0) {
+      return {
+        status: 'advisory',
+        value: dkimRecord,
+        details: [...summary, ...advisories].join('; '),
+      };
+    }
 
     return {
       status: 'success',
-      value: dkimRecord
+      value: dkimRecord,
+      details: summary.join(', ') || undefined,
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOTFOUND' || (error as NodeJS.ErrnoException).code === 'ENODATA') {
@@ -81,6 +107,42 @@ async function checkDKIM(domain: string, selector: string): Promise<DNSCheckResu
       status: 'error',
       value: '',
       details: (error as Error).message
+    };
+  }
+}
+
+type DkimKeyInfo = {
+  bits: number | null;
+  algorithm: string | null;
+  revoked: boolean;
+  parseError: boolean;
+};
+
+function parseDkimKey(record: string): DkimKeyInfo {
+  const tags: Record<string, string> = {};
+  for (const segment of record.split(';')) {
+    const eq = segment.indexOf('=');
+    if (eq === -1) continue;
+    const key = segment.slice(0, eq).trim().toLowerCase();
+    const value = segment.slice(eq + 1).trim();
+    tags[key] = value;
+  }
+
+  const p = (tags.p ?? '').replace(/\s+/g, '');
+  if (!p) {
+    return { bits: null, algorithm: null, revoked: true, parseError: false };
+  }
+
+  const declaredType = (tags.k ?? 'rsa').toLowerCase(); // DKIM default is rsa
+  try {
+    const der = Buffer.from(p, 'base64');
+    const pk = createPublicKey({ key: der, format: 'der', type: 'spki' });
+    const details = pk.asymmetricKeyDetails ?? {};
+    const algorithm = pk.asymmetricKeyType ?? declaredType;
+    const bits = typeof details.modulusLength === 'number' ? details.modulusLength : null;
+    return { bits, algorithm, revoked: false, parseError: bits === null && algorithm !== 'ed25519' };
+  } catch {
+    return { bits: null, algorithm: declaredType, revoked: false, parseError: true   details: (error as Error).message
     };
   }
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatRelativeTime, getStaleness, stalenessClasses } from '@/utils/time';
+import CopyButton from '@/components/CopyButton';
 import { 
   ChevronDownIcon, 
   ArrowPathIcon,
@@ -182,11 +183,14 @@ export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: Doma
     if (!record) {
       return <span className="text-gray-500">Not configured</span>;
     }
-    
+
     const [value, details] = record.split(' (');
     return (
       <div className="space-y-2">
-        <span className="font-mono block">{value}</span>
+        <div className="flex items-start gap-3">
+          <span className="font-mono break-all flex-1">{value}</span>
+          <CopyButton value={value} className="shrink-0 mt-1" />
+        </div>
         {details && (
           <div className="flex items-center gap-2">
             <span className={`text-sm px-2 py-0.5 rounded-full ${getStatusColor(status, isDismissed(type || ''))}`}>
