@@ -142,8 +142,7 @@ function parseDkimKey(record: string): DkimKeyInfo {
     const bits = typeof details.modulusLength === 'number' ? details.modulusLength : null;
     return { bits, algorithm, revoked: false, parseError: bits === null && algorithm !== 'ed25519' };
   } catch {
-    return { bits: null, algorithm: declaredType, revoked: false, parseError: true   details: (error as Error).message
-    };
+    return { bits: null, algorithm: declaredType, revoked: false, parseError: true };
   }
 }
 

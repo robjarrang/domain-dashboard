@@ -1,4 +1,4 @@
-// File: /Users/robmoran/Documents/Email Builds/domain-dashboard/src/app/api/domains/[id]/route.ts
+// File: /Users/rob.moran/Email Builds/domain-dashboard/src/app/api/domains/[id]/route.ts
 import * as entry from '../../../../../../src/app/api/domains/[id]/route.js'
 import type { NextRequest } from 'next/server.js'
 

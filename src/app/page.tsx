@@ -340,7 +340,6 @@ export default function Home() {
           onClick={() => setIsAddingDomain(true)}
           className="btn-primary inline-flex items-center gap-2"
         >
-        ref={searchInputRef}
           <PlusIcon className="w-5 h-5" />
           Add Domain
         </button>
@@ -380,6 +379,7 @@ export default function Home() {
       )}
 
       <SearchFilter 
+        ref={searchInputRef}
         searchQuery={searchQuery} 
         onSearchChange={setSearchQuery}
         sortOption={sortOption}

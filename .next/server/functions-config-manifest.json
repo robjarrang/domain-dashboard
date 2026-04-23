@@ -1,1 +1,1 @@
-{"version":1,"functions":{"/api/domains/[id]":{}}}
+{"version":1,"functions":{"/api/cron/check-domains":{"maxDuration":60},"/api/domains/[id]":{}}}

@@ -1,4 +1,4 @@
-// File: /Users/robmoran/Documents/Email Builds/domain-dashboard/src/app/layout.tsx
+// File: /Users/rob.moran/Email Builds/domain-dashboard/src/app/layout.tsx
 import * as entry from '../../../src/app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

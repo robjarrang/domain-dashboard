@@ -118,11 +118,11 @@ function parseDmarcReportAddresses(dmarc: string | null): { rua: string[]; ruf: 
     const key = segment.slice(0, eq).trim().toLowerCase();
     tags[key] = segment.slice(eq + 1).trim();
   }
-  const split = (value?: string): string[] =>
+  const splitList = (value?: string): string[] =>
     value
       ? value.split(',').map(v => v.trim()).filter(Boolean)
       : [];
-  return { rua: split(tags.rua), ruf: split(tags.ruf) };
+  return { rua: splitList(tags.rua), ruf: splitList(tags.ruf) };
 }
 
 function renderDmarcReportAddresses(dmarc: string | null) {
@@ -131,7 +131,7 @@ function renderDmarcReportAddresses(dmarc: string | null) {
   const renderList = (addrs: string[]) => (
     <ul className="mt-1 space-y-1">
       {addrs.map(addr => {
-        const href = addr.startsWith('mailto:') || addr.startsWith('https:') ? addr : addr;
+        const href = addr;
         const display = addr.replace(/^mailto:/, '');
         return (
           <li key={addr} className="text-sm">
@@ -165,6 +165,7 @@ function renderDmarcReportAddresses(dmarc: string | null) {
     </div>
   );
 }
+
 
 export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: DomainCardProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -423,10 +424,10 @@ export default function DomainCard({ domain, onRefresh, onDelete, onEdit }: Doma
             title="Refresh DNS records"
           >
             <ArrowPathIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-          </butonClick={(e) => e.stopPropagation()}>
+          </button>
+          <div onClick={(e) => e.stopPropagation()}>
             <DomainToolsMenu domain={domain.name} />
           </div>
-          <div ton>
           <div className="p-2.5 rounded-full text-deep-teal">
             {isOpen ? (
               <ChevronUpIcon className="w-5 h-5" />
