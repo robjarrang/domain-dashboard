@@ -31,9 +31,17 @@ export async function GET(
     return NextResponse.json(history);
   } catch (error) {
     console.error('Error fetching DNS history:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch DNS history' },
-      { status: 500 }
-    );
+    const body: { error: string; detail?: string; code?: string } = {
+      error: 'Failed to fetch DNS history',
+    };
+    if (process.env.NODE_ENV !== 'production') {
+      if (error instanceof Error) {
+        body.detail = error.message;
+      }
+      if (typeof (error as { code?: unknown })?.code === 'string') {
+        body.code = (error as { code: string }).code;
+      }
+    }
+    return NextResponse.json(body, { status: 500 });
   }
 }
